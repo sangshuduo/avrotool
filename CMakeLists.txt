@@ -4,14 +4,6 @@ project(avro-c
     VERSION 0.0.1
 )
 
+add_subdirectory(deps)
 add_subdirectory(src)
-
-INCLUDE(FetchContent)
-
-FetchContent_Declare(avro
-    GIT_REPOSITORY    https://github.com/apache/avro.git
-)
-MESSAGE("Downloading dependencies..")
-FetchContent_MakeAvailable(avro)
-MESSAGE("Completed to download dependencies.")
 
