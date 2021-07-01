@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include <avro.h>
 
 typedef struct SArguments_S {
@@ -24,27 +25,30 @@ static void printHelp()
     printf("\n");
 }
 
-static void parse_args(int argc, char *argv[], SArguments *arguments)
+static bool parse_args(int argc, char *argv[], SArguments *arguments)
 {
+    bool has_flags = false;
+
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-r") == 0) {
             arguments->filename = argv[++i];
+            has_flags = true;
         } else if (strcmp(argv[i], "--help") == 0) {
             printHelp();
             exit(0);
         }
     }
+
+    return has_flags;
 }
 
 
 int main(int argc, char **argv) {
 
-    if (argc < 2) {
+    if ((argc < 2) || (false == parse_args(argc, argv, &g_args))) {
         printHelp();
         exit(0);
     }
-
-    parse_args(argc, argv, &g_args);
 
     avro_file_reader_t reader;
     avro_writer_t stdout_writer = avro_writer_file_fp(stdout, 0);
@@ -53,7 +57,7 @@ int main(int argc, char **argv) {
     char *json=NULL;
 
     if(avro_file_reader(g_args.filename, &reader)) {
-        fprintf(stderr, "Unable to open avro file %s: %s\n", argv[1], avro_strerror());
+        fprintf(stderr, "Unable to open avro file %s: %s\n", g_args.filename, avro_strerror());
         exit(EXIT_FAILURE);
     }
     schema = avro_file_reader_get_writer_schema(reader);
