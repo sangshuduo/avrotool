@@ -9,7 +9,7 @@ add_subdirectory(src)
 INCLUDE(FetchContent)
 
 FetchContent_Declare(avro
-    GIT_REPOSITORY    git@github.com:apache/avro.git
+    GIT_REPOSITORY    https://github.com/apache/avro.git
 )
 MESSAGE("Downloading dependencies..")
 FetchContent_MakeAvailable(avro)
