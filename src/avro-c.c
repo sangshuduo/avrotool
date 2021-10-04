@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <ctype.h>
+#include <stdint.h>
 #include <stdbool.h>
 #include <limits.h>
 #include <avro.h>
@@ -6,7 +8,7 @@
 typedef struct SArguments_S {
     bool read_file;
     char *read_filename;
-    unsigned int count;
+    uint64_t count;
     bool schema_only;
     bool write_file;
     char *write_filename;
@@ -16,7 +18,7 @@ typedef struct SArguments_S {
 SArguments g_args = {
     false,          // read_file
     "",             // read_filename
-    UINT_MAX,       // count
+    UINT64_MAX,       // count
     false,          // schema_only
     false,          // write_file
     "",             // write_filename
@@ -46,6 +48,21 @@ static void printHelp()
     printf("\n");
 }
 
+static bool isStringNumber(char *input)
+{
+    int len = strlen(input);
+    if (0 == len) {
+        return false;
+    }
+
+    for (int i = 0; i < len; i++) {
+        if (!isdigit(input[i]))
+            return false;
+    }
+
+    return true;
+}
+
 static bool parse_args(int argc, char *argv[], SArguments *arguments)
 {
     bool has_flags = true;
@@ -58,7 +75,9 @@ static bool parse_args(int argc, char *argv[], SArguments *arguments)
             arguments->schema_only = true;
             arguments->read_filename = argv[++i];
         } else if (strcmp(argv[i], "-c") == 0) {
-            arguments->count = atoi(argv[i+1]);
+            if (isStringNumber(argv[i+1])) {
+                arguments->count = atoi(argv[++i]);
+            }
         } else if (strcmp(argv[i], "-w") == 0) {
             arguments->write_file = true;
             arguments->write_file = argv[i+1];
@@ -122,7 +141,7 @@ int main(int argc, char **argv) {
         exit(0);
     }
 
-    if (g_args.read_file) {
+    if (g_args.read_file || g_args.schema_only) {
         read_avro_file();
     }
 
