@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <limits.h>
+#include <assert.h>
 #include <avro.h>
 
 typedef struct SArguments_S {
@@ -80,9 +81,9 @@ static bool parse_args(int argc, char *argv[], SArguments *arguments)
             }
         } else if (strcmp(argv[i], "-w") == 0) {
             arguments->write_file = true;
-            arguments->write_file = argv[i+1];
+            arguments->write_file = argv[++i];
         } else if (strcmp(argv[i], "-m") == 0) {
-            arguments->json_filename = argv[i+1];
+            arguments->json_filename = argv[++i];
         } else if (strcmp(argv[i], "--help") == 0) {
             printHelp();
             exit(0);
@@ -129,9 +130,36 @@ static void read_avro_file()
     printf("\n");
 }
 
-static void write_avro_file()
+static int write_avro_file()
 {
+    avro_file_writer_t  file;
+    avro_schema_t  writer_schema;
+    avro_schema_error_t  error;
+    avro_value_iface_t  *writer_iface;
+    avro_value_t  writer_value;
+    avro_value_t  field;
 
+    FILE *fp = fopen(g_args.json_filename, "r");
+    if (NULL == fp) {
+        fprintf(stderr, "Failed to open %s\n", g_args.json_filename);
+        exit(EXIT_FAILURE);
+    }
+
+    fseek(fp, 0, SEEK_END);
+    int size = ftell(fp);
+
+    char *json = malloc(size);
+    assert(json);
+
+    fseek(fp, 0, SEEK_SET);
+    fread(json, 1, size, fp);
+
+#ifdef DEBUG
+    printf("json content:\n%s\n", json);
+#endif
+
+    fclose(fp);
+    return 0;
 }
 
 int main(int argc, char **argv) {
@@ -143,9 +171,7 @@ int main(int argc, char **argv) {
 
     if (g_args.read_file || g_args.schema_only) {
         read_avro_file();
-    }
-
-    if (g_args.write_file) {
+    } else if (g_args.write_file) {
         write_avro_file();
     }
     exit(EXIT_SUCCESS);
