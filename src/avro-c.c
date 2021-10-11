@@ -14,6 +14,7 @@ typedef struct SArguments_S {
     bool write_file;
     char *write_filename;
     char *json_filename;
+    char *data_filename;
 } SArguments;
 
 SArguments g_args = {
@@ -24,6 +25,7 @@ SArguments g_args = {
     false,          // write_file
     "",             // write_filename
     "",             // json_filename
+    "",             // data_filename
 };
 
 static void printHelp()
@@ -43,6 +45,8 @@ static void printHelp()
             "<avro filename>. specify avro filename to write.");
     printf("%s%s%s%s\n", indent, "-m\t", indent,
             "<json filename>. use json as schema to write data to avro file.");
+    printf("%s%s%s%s\n", indent, "-d\t", indent,
+            "<data filename>. use csv file as input data.");
     printf("%s%s%s%s\n", indent, "--help\t", indent,
             "Print command line arguments list info.");
 
@@ -84,6 +88,8 @@ static bool parse_args(int argc, char *argv[], SArguments *arguments)
             arguments->write_file = argv[++i];
         } else if (strcmp(argv[i], "-m") == 0) {
             arguments->json_filename = argv[++i];
+        } else if (strcmp(argv[i], "-d") == 0) {
+            arguments->data_filename = argv[++i];
         } else if (strcmp(argv[i], "--help") == 0) {
             printHelp();
             exit(0);
@@ -150,7 +156,6 @@ static int write_avro_file()
 
     char *json = malloc(size);
     assert(json);
-
     fseek(fp, 0, SEEK_SET);
     fread(json, 1, size, fp);
 
@@ -158,6 +163,32 @@ static int write_avro_file()
     printf("json content:\n%s\n", json);
 #endif
 
+    FILE *fd = fopen(g_args.data_filename, "r");
+    if (NULL == fd) {
+        fprintf(stderr, "Failed to open %s\n", g_args.data_filename);
+        fclose(fp);
+        exit(EXIT_FAILURE);
+    }
+
+    ssize_t n = 0;
+    ssize_t readLen = 0;
+    char *line = NULL;
+
+    fseek(fd, 0, SEEK_SET);
+
+    while(-1 != readLen) {
+        readLen = getline(&line, &n, fd);
+
+#ifdef DEBUG
+        if (readLen != -1) {
+            printf("%s", line);
+        }
+#endif
+    }
+
+    free(line);
+
+    fclose(fd);
     fclose(fp);
     return 0;
 }
