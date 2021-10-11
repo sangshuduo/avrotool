@@ -4,4 +4,4 @@
 [![build](https://github.com/sangshuduo/avro-c/actions/workflows/build.yml/badge.svg?branch=develop)](https://github.com/sangshuduo/avro-c/actions/workflows/build.yml)
 
 # build debug version
-cmake .. -DCMAKE_BUILD_TYPE=Debug
+cmake .. -DCMAKE_BUILD_TYPE=DEBUG

@@ -6,6 +6,12 @@
 #include <assert.h>
 #include <avro.h>
 
+#ifdef DEFLATE_CODEC
+#define QUICKSTOP_CODEC  "deflate"
+#else
+#define QUICKSTOP_CODEC  "null"
+#endif
+
 typedef struct SArguments_S {
     bool read_file;
     char *read_filename;
@@ -85,7 +91,7 @@ static bool parse_args(int argc, char *argv[], SArguments *arguments)
             }
         } else if (strcmp(argv[i], "-w") == 0) {
             arguments->write_file = true;
-            arguments->write_file = argv[++i];
+            arguments->write_filename = argv[++i];
         } else if (strcmp(argv[i], "-m") == 0) {
             arguments->json_filename = argv[++i];
         } else if (strcmp(argv[i], "-d") == 0) {
@@ -154,14 +160,38 @@ static int write_avro_file()
     fseek(fp, 0, SEEK_END);
     int size = ftell(fp);
 
-    char *json = malloc(size);
+    char *json = calloc(size, 1);
     assert(json);
     fseek(fp, 0, SEEK_SET);
-    fread(json, 1, size, fp);
+    fread(json, 1, size-1, fp);
 
 #ifdef DEBUG
     printf("json content:\n%s\n", json);
 #endif
+
+    avro_schema_t schema;
+    if (avro_schema_from_json_length(json, strlen(json), &schema)) {
+        fprintf(stderr, "Unable to parse schema\n");
+        fprintf(stderr, "%s() LN%d, error message: %s\n",
+                __func__, __LINE__, avro_strerror());
+        fclose(fp);
+        exit(EXIT_FAILURE);
+    }
+
+    remove(g_args.write_filename);
+
+    avro_file_writer_t db;
+
+    int rval = avro_file_writer_create_with_codec
+        (g_args.write_filename, schema, &db, QUICKSTOP_CODEC, 0);
+    if (rval) {
+        fclose(fp);
+        fprintf(stderr, "There was an error creating %s\n", g_args.write_filename);
+        fprintf(stderr, "%s() LN%d, error message: %s\n",
+                __func__, __LINE__,
+                avro_strerror());
+        exit(EXIT_FAILURE);
+    }
 
     FILE *fd = fopen(g_args.data_filename, "r");
     if (NULL == fd) {
@@ -184,12 +214,15 @@ static int write_avro_file()
             printf("%s", line);
         }
 #endif
+
     }
 
     free(line);
 
     fclose(fd);
     fclose(fp);
+
+    avro_file_writer_close(db);
     return 0;
 }
 
