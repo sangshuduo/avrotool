@@ -142,6 +142,14 @@ static void read_avro_file()
     printf("\n");
 }
 
+static int write_record_to_file(
+    avro_file_writer_t *db,
+    char *line,
+    avro_schema_t *schema)
+{
+    return 0;
+}
+
 static int write_avro_file()
 {
     avro_file_writer_t  file;
@@ -209,11 +217,12 @@ static int write_avro_file()
     while(-1 != readLen) {
         readLen = getline(&line, &n, fd);
 
-#ifdef DEBUG
         if (readLen != -1) {
+#ifdef DEBUG
             printf("%s", line);
-        }
 #endif
+            write_record_to_file(&db, line, &schema);
+        }
 
     }
 
