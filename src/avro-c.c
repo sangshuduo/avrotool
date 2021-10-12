@@ -13,6 +13,17 @@
 #define QUICKSTOP_CODEC  "null"
 #endif
 
+typedef struct FieldStruct_S {
+    char name[64];
+    char type[16];
+} FieldStruct;
+
+typedef struct RecordSchema_S {
+    char name[64];
+    char *fields;
+    int  num_fields;
+} RecordSchema;
+
 typedef struct SArguments_S {
     bool read_file;
     char *read_filename;
@@ -274,7 +285,7 @@ static void read_avro_file()
         fseek(jsonfile, 0, SEEK_END);
         int size = ftell(jsonfile);
 
-        char *jsonbuf = calloc(size, 1);
+        char *jsonbuf = calloc(size + 1, 1);
         assert(jsonbuf);
         fseek(jsonfile, 0, SEEK_SET);
         fread(jsonbuf, 1, size, jsonfile);
@@ -310,15 +321,91 @@ static void read_avro_file()
 static int write_record_to_file(
     avro_file_writer_t *db,
     char *line,
-    avro_schema_t *schema)
+    avro_schema_t *schema,
+    RecordSchema *recordSchema)
 {
-    avro_value_iface_t  *iface =
+    avro_value_iface_t  *wface =
         avro_generic_class_from_schema(*schema);
 
     avro_value_t record;
-    avro_generic_value_new(iface, &record);
+    avro_generic_value_new(wface, &record);
 
+
+    avro_value_decref(&record);
+    avro_value_iface_decref(wface);
     return 0;
+}
+
+
+static RecordSchema *parse_json_to_recordschema(json_t *element)
+{
+    RecordSchema *recordSchema = malloc(sizeof(RecordSchema));
+    assert(recordSchema);
+
+    int indent = 0;
+
+    if (JSON_OBJECT != json_typeof(element)) {
+        fprintf(stderr, "%s() LN%d, json passed is not an object\n",
+                __func__, __LINE__);
+        return NULL;
+    }
+
+    size_t size;
+    const char *key;
+    json_t *value;
+
+    json_object_foreach(element, key, value) {
+        if (0 == strcmp(key, "name")) {
+            strcpy(recordSchema->name, json_string_value(value));
+        } else if (0 == strcmp(key, "fields")) {
+            if (JSON_ARRAY == json_typeof(value)) {
+
+                size_t i;
+                size_t size = json_array_size(value);
+
+#ifdef DEBUG
+                printf("JSON Array of %lld element%s:\n", (long long)size, json_plural(size));
+#endif
+
+                recordSchema->num_fields = size;
+                recordSchema->fields = malloc(sizeof(FieldStruct) * size);
+                assert(recordSchema->fields);
+
+                for (i = 0; i < size; i++) {
+                    FieldStruct *field = (FieldStruct *)(recordSchema->fields + sizeof(FieldStruct) * i);
+                    json_t *arr_element = json_array_get(value, i);
+                    const char *ele_key;
+                    json_t *ele_value;
+
+                    json_object_foreach(arr_element, ele_key, ele_value) {
+                        if (0 == strcmp(ele_key, "name")) {
+                            strcpy(field->name, json_string_value(ele_value));
+                        } else if (0 == strcmp(ele_key, "type")) {
+                            strcpy(field->type, json_string_value(ele_value));
+                        }
+                    }
+                }
+            } else {
+                fprintf(stderr, "%s() LN%d, fields have no array\n",
+                        __func__, __LINE__);
+                return NULL;
+            }
+
+            break;
+        }
+    }
+
+    return recordSchema;
+}
+
+static void freeRecordSchema(RecordSchema *recordSchema)
+{
+    if (recordSchema) {
+        if (recordSchema->fields) {
+            free(recordSchema->fields);
+        }
+        free(recordSchema);
+    }
 }
 
 static int write_avro_file()
@@ -339,13 +426,13 @@ static int write_avro_file()
     fseek(fp, 0, SEEK_END);
     int size = ftell(fp);
 
-    char *jsonbuf = calloc(size, 1);
+    char *jsonbuf = calloc(size + 1, 1);
     assert(jsonbuf);
     fseek(fp, 0, SEEK_SET);
     fread(jsonbuf, 1, size, fp);
 
 #ifdef DEBUG
-    printf("json content:\n%s\n", jsonbuf);
+    printf("*** json content:\n%s\n", jsonbuf);
 #endif
 
     avro_schema_t schema;
@@ -358,6 +445,31 @@ static int write_avro_file()
         exit(EXIT_FAILURE);
     }
 
+    json_t *json_root = load_json(jsonbuf);
+    free(jsonbuf);
+
+    RecordSchema *recordSchema;
+
+    if (json_root) {
+#ifdef DEBUG
+        print_json(json_root);
+#endif
+
+        recordSchema = parse_json_to_recordschema(json_root);
+
+        if (NULL == recordSchema) {
+            fclose(fp);
+            fprintf(stderr, "Failed to parse json to recordschema\n");
+            exit(EXIT_FAILURE);
+        }
+
+        json_decref(json_root);
+    } else {
+        fclose(fp);
+        fprintf(stderr, "json can't be parsed by jansson\n");
+        exit(EXIT_FAILURE);
+    }
+
     remove(g_args.write_filename);
 
     avro_file_writer_t db;
@@ -365,6 +477,7 @@ static int write_avro_file()
     int rval = avro_file_writer_create_with_codec
         (g_args.write_filename, schema, &db, QUICKSTOP_CODEC, 0);
     if (rval) {
+        freeRecordSchema(recordSchema);
         fclose(fp);
         fprintf(stderr, "There was an error creating %s\n", g_args.write_filename);
         fprintf(stderr, "%s() LN%d, error message: %s\n",
@@ -375,6 +488,7 @@ static int write_avro_file()
 
     FILE *fd = fopen(g_args.data_filename, "r");
     if (NULL == fd) {
+        freeRecordSchema(recordSchema);
         fprintf(stderr, "Failed to open %s\n", g_args.data_filename);
         fclose(fp);
         exit(EXIT_FAILURE);
@@ -393,12 +507,14 @@ static int write_avro_file()
 #ifdef DEBUG
             printf("%s", line);
 #endif
-            write_record_to_file(&db, line, &schema);
+            write_record_to_file(&db, line, &schema, recordSchema);
         }
-
     }
 
+    avro_schema_decref(schema);
+
     free(line);
+    freeRecordSchema(recordSchema);
 
     fclose(fd);
     fclose(fp);

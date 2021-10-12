@@ -26,7 +26,7 @@ ENDIF ()
 
 IF (${CMAKE_BUILD_TYPE} MATCHES "DEBUG")
     MESSAGE("${Yellow} DEBUG mode ${ColourReSET}")
-    SET(CMAKE_C_FLAGS "-DDEBUG")
+    SET(CMAKE_C_FLAGS "-fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow -fno-sanitize=null -fno-sanitize=alignment -O0 -g3 -DDEBUG")
 ELSE ()
     MESSAGE("${Green} RELEASE mode ${ColourReSET}")
     SET(CMAKE_C_FLAGS "-DRELEASE")
