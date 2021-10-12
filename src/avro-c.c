@@ -288,6 +288,7 @@ static void read_avro_file()
     fclose(jsonfile);
 
     avro_schema_decref(schema);
+    printf("\n");
 
     unsigned int count = 0;
     if (false == g_args.schema_only) {
@@ -311,6 +312,12 @@ static int write_record_to_file(
     char *line,
     avro_schema_t *schema)
 {
+    avro_value_iface_t  *iface =
+        avro_generic_class_from_schema(*schema);
+
+    avro_value_t record;
+    avro_generic_value_new(iface, &record);
+
     return 0;
 }
 
