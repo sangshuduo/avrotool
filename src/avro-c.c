@@ -8,9 +8,9 @@
 #include <jansson.h>
 
 #ifdef DEFLATE_CODEC
-#define QUICKSTOP_CODEC  "deflate"
+    #define QUICKSTOP_CODEC  "deflate"
 #else
-#define QUICKSTOP_CODEC  "null"
+    #define QUICKSTOP_CODEC  "null"
 #endif
 
 #define RECORD_NAME_LEN     64
@@ -58,6 +58,7 @@ SArguments g_args = {
   } while (0)
 
 
+static RecordSchema *parse_json_to_recordschema(json_t *element);
 static void print_json_aux(json_t *element, int indent);
 
 static void printHelp()
@@ -270,10 +271,20 @@ static void print_json_by_jansson(char *jsonbuf)
     }
 }
 
+static void freeRecordSchema(RecordSchema *recordSchema)
+{
+    if (recordSchema) {
+        if (recordSchema->fields) {
+            free(recordSchema->fields);
+        }
+        free(recordSchema);
+    }
+}
+
 static void read_avro_file()
 {
     avro_file_reader_t reader;
-    avro_writer_t stdout_writer = avro_writer_file_fp(stdout, 0);
+    avro_writer_t stdout_writer = avro_writer_file_fp(stdout, 1);
 
     avro_schema_t schema;
     avro_datum_t record;
@@ -290,8 +301,12 @@ static void read_avro_file()
     printf("\n");
 
     FILE *jsonfile = fopen("jsonfile.json", "w+");
+    avro_writer_t jsonfile_writer;
+    json_t *json_root = NULL;
+    RecordSchema *recordSchema;
+
     if (jsonfile) {
-        avro_writer_t jsonfile_writer = avro_writer_file_fp(jsonfile, 0);
+        jsonfile_writer = avro_writer_file_fp(jsonfile, 0);
         avro_schema_to_json(schema, jsonfile_writer);
 
         fseek(jsonfile, 0, SEEK_END);
@@ -302,36 +317,70 @@ static void read_avro_file()
         fseek(jsonfile, 0, SEEK_SET);
         fread(jsonbuf, 1, size, jsonfile);
 
+        json_root = load_json(jsonbuf);
 #ifdef DEBUG
-        printf("\n*** Schema parsed:\n");
-        print_json_by_jansson(jsonbuf);
+        printf("\n%s() LN%d\n *** Schema parsed:\n", __func__, __LINE__);
+        print_json(json_root);
+
+        recordSchema = parse_json_to_recordschema(json_root);
+        if (NULL == recordSchema) {
+            fclose(jsonfile);
+            fprintf(stderr, "Failed to parse json to recordschema\n");
+            exit(EXIT_FAILURE);
+        }
+
+        json_decref(json_root);
 #endif
         free(jsonbuf);
     }
     fclose(jsonfile);
 
-    avro_schema_decref(schema);
-    printf("\n");
+    uint64_t count = 0;
 
-    unsigned int count = 0;
     if (false == g_args.schema_only) {
         printf("\n*** Records:\n");
-        while(!avro_file_reader_read(reader, NULL, &record)
-                && (count < g_args.count)) {
-            avro_datum_to_json(record, 0, &json);
-            puts(json);
-            free(json);
-            avro_datum_decref(record);
-            count++;
+        avro_value_iface_t *value_class = avro_generic_class_from_schema(schema);
+        avro_value_t value;
+        avro_generic_value_new(value_class, &value);
+
+        while(!avro_file_reader_read_value(reader, &value)) {
+            for (int i = 0; i < recordSchema->num_fields; i++) {
+                FieldStruct *field = (FieldStruct *)(recordSchema->fields + sizeof(FieldStruct) * i);
+                avro_value_t field_value;
+                int32_t n32;
+                float f;
+                int64_t n64;
+                if (0 == avro_value_get_by_name(&value, field->name, &field_value, NULL)) {
+                    if (0 == strcmp(field->type, "int")) {
+                        avro_value_get_int(&field_value, &n32);
+                        printf("%d | ", n32);
+                    } else if (0 == strcmp(field->type, "float")) {
+                        avro_value_get_float(&field_value, &f);
+                        printf("%f | ", f);
+                    } else if (0 == strcmp(field->type, "long")) {
+                        avro_value_get_long(&field_value, &n64);
+                        printf("%"PRId64" | ", n64);
+                    }
+                }
+            }
+            printf("\n");
         }
+
+        avro_value_decref(&value);
+        avro_value_iface_decref(value_class);
     }
 
-    avro_file_reader_close(reader);
     printf("\n");
+
+    freeRecordSchema(recordSchema);
+    avro_schema_decref(schema);
+    avro_file_reader_close(reader);
+    avro_writer_free(stdout_writer);
+    avro_writer_free(jsonfile_writer);
 }
 
 static int write_record_to_file(
-    avro_file_writer_t *db,
+    avro_file_writer_t db,
     char *line,
     avro_schema_t *schema,
     RecordSchema *recordSchema)
@@ -342,19 +391,42 @@ static int write_record_to_file(
     avro_value_t record;
     avro_generic_value_new(wface, &record);
 
+    char *word;
+
+    for(int i = 0; i < recordSchema->num_fields; i++) {
+        word = strsep(&line, ",");
+
+        avro_value_t value;
+        FieldStruct *field = (FieldStruct *)(recordSchema->fields + sizeof(FieldStruct) * i);
+        if (avro_value_get_by_name(&record, field->name, &value, NULL) == 0) {
+            if (0 == strcmp(field->type, "string")) {
+                avro_value_set_string(&value, word);
+            } else if (0 == strcmp(field->type, "long")) {
+                avro_value_set_long(&value, atol(word));
+            } else if (0 == strcmp(field->type, "int")) {
+                avro_value_set_int(&value, atoi(word));
+            } else if (0 == strcmp(field->type, "float")) {
+                avro_value_set_float(&value, atof(word));
+            }
+        }
+    }
+
+    if (avro_file_writer_append_value(db, &record)) {
+        fprintf(stderr,
+                "%s() LN%d, Unable to write record to file. Message: %s",
+                __func__, __LINE__,
+                avro_strerror());
+    }
 
     avro_value_decref(&record);
     avro_value_iface_decref(wface);
     return 0;
 }
 
-
 static RecordSchema *parse_json_to_recordschema(json_t *element)
 {
     RecordSchema *recordSchema = malloc(sizeof(RecordSchema));
     assert(recordSchema);
-
-    int indent = 0;
 
     if (JSON_OBJECT != json_typeof(element)) {
         fprintf(stderr, "%s() LN%d, json passed is not an object\n",
@@ -376,7 +448,9 @@ static RecordSchema *parse_json_to_recordschema(json_t *element)
                 size_t size = json_array_size(value);
 
 #ifdef DEBUG
-                printf("JSON Array of %lld element%s:\n", (long long)size, json_plural(size));
+                printf("%s() LN%d, JSON Array of %lld element%s:\n",
+                        __func__, __LINE__,
+                        (long long)size, json_plural(size));
 #endif
 
                 recordSchema->num_fields = size;
@@ -393,7 +467,24 @@ static RecordSchema *parse_json_to_recordschema(json_t *element)
                         if (0 == strcmp(ele_key, "name")) {
                             tstrncpy(field->name, json_string_value(ele_value), FIELD_NAME_LEN-1);
                         } else if (0 == strcmp(ele_key, "type")) {
-                            tstrncpy(field->type, json_string_value(ele_value), TYPE_NAME_LEN-1);
+                            if (JSON_STRING == json_typeof(ele_value)) {
+                                tstrncpy(field->type, json_string_value(ele_value), TYPE_NAME_LEN-1);
+                            } else if (JSON_OBJECT == json_typeof(ele_value)) {
+                                size_t obj_size;
+                                const char *obj_key;
+                                json_t *obj_value;
+
+                                obj_size = json_object_size(ele_value);
+
+                                json_object_foreach(ele_value, obj_key, obj_value) {
+                                    if (0 == strcmp(obj_key, "type")) {
+                                        if (JSON_STRING == json_typeof(obj_value)) {
+                                            tstrncpy(field->type,
+                                                    json_string_value(obj_value), TYPE_NAME_LEN-1);
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -408,16 +499,6 @@ static RecordSchema *parse_json_to_recordschema(json_t *element)
     }
 
     return recordSchema;
-}
-
-static void freeRecordSchema(RecordSchema *recordSchema)
-{
-    if (recordSchema) {
-        if (recordSchema->fields) {
-            free(recordSchema->fields);
-        }
-        free(recordSchema);
-    }
 }
 
 static int write_avro_file()
@@ -444,7 +525,7 @@ static int write_avro_file()
     fread(jsonbuf, 1, size, fp);
 
 #ifdef DEBUG
-    printf("*** json content:\n%s\n", jsonbuf);
+    printf("%s() LN%d\n *** json content:\n%s\n", __func__, __LINE__, jsonbuf);
 #endif
 
     avro_schema_t schema;
@@ -519,7 +600,7 @@ static int write_avro_file()
 #ifdef DEBUG
             printf("%s", line);
 #endif
-            write_record_to_file(&db, line, &schema, recordSchema);
+            write_record_to_file(db, line, &schema, recordSchema);
         }
     }
 
