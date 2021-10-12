@@ -12,3 +12,9 @@ cmake .. -DCMAKE_BUILD_TYPE=DEBUG
 
 - no debug info
 cmake ..
+
+# write data to avro example
+./build/bin/avro-c -w w.avro -m ../sampledata/schema.json -d ../sampledata/data.csv
+
+# read avro file
+./build/bin/avro-c -r w.avro
