@@ -7,4 +7,8 @@
 apt install libjansson-dev
 
 # build debug version
+- For debug purpose
 cmake .. -DCMAKE_BUILD_TYPE=DEBUG
+
+- no debug info
+cmake ..
