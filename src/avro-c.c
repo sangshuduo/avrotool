@@ -13,13 +13,17 @@
 #define QUICKSTOP_CODEC  "null"
 #endif
 
+#define RECORD_NAME_LEN     64
+#define FIELD_NAME_LEN      64
+#define TYPE_NAME_LEN       16
+
 typedef struct FieldStruct_S {
-    char name[64];
-    char type[16];
+    char name[FIELD_NAME_LEN];
+    char type[TYPE_NAME_LEN];
 } FieldStruct;
 
 typedef struct RecordSchema_S {
-    char name[64];
+    char name[RECORD_NAME_LEN];
     char *fields;
     int  num_fields;
 } RecordSchema;
@@ -45,6 +49,14 @@ SArguments g_args = {
     "",             // json_filename
     "",             // data_filename
 };
+
+
+#define tstrncpy(dst, src, size) \
+  do {                              \
+    strncpy((dst), (src), (size));  \
+    (dst)[(size)-1] = 0;            \
+  } while (0)
+
 
 static void print_json_aux(json_t *element, int indent);
 
@@ -356,7 +368,7 @@ static RecordSchema *parse_json_to_recordschema(json_t *element)
 
     json_object_foreach(element, key, value) {
         if (0 == strcmp(key, "name")) {
-            strcpy(recordSchema->name, json_string_value(value));
+            tstrncpy(recordSchema->name, json_string_value(value), RECORD_NAME_LEN-1);
         } else if (0 == strcmp(key, "fields")) {
             if (JSON_ARRAY == json_typeof(value)) {
 
@@ -379,9 +391,9 @@ static RecordSchema *parse_json_to_recordschema(json_t *element)
 
                     json_object_foreach(arr_element, ele_key, ele_value) {
                         if (0 == strcmp(ele_key, "name")) {
-                            strcpy(field->name, json_string_value(ele_value));
+                            tstrncpy(field->name, json_string_value(ele_value), FIELD_NAME_LEN-1);
                         } else if (0 == strcmp(ele_key, "type")) {
-                            strcpy(field->type, json_string_value(ele_value));
+                            tstrncpy(field->type, json_string_value(ele_value), TYPE_NAME_LEN-1);
                         }
                     }
                 }
