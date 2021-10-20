@@ -303,8 +303,9 @@ static void read_avro_file()
     FILE *jsonfile = fopen("jsonfile.json", "w+");
     avro_writer_t jsonfile_writer;
     json_t *json_root = NULL;
-    RecordSchema *recordSchema;
+    RecordSchema *recordSchema = NULL;
 
+        printf("%d reocrdschema=%p\n", __LINE__, recordSchema);
     if (jsonfile) {
         jsonfile_writer = avro_writer_file_fp(jsonfile, 0);
         avro_schema_to_json(schema, jsonfile_writer);
@@ -321,6 +322,7 @@ static void read_avro_file()
 #ifdef DEBUG
         printf("\n%s() LN%d\n *** Schema parsed:\n", __func__, __LINE__);
         print_json(json_root);
+#endif
 
         recordSchema = parse_json_to_recordschema(json_root);
         if (NULL == recordSchema) {
@@ -330,7 +332,6 @@ static void read_avro_file()
         }
 
         json_decref(json_root);
-#endif
         free(jsonbuf);
     }
     fclose(jsonfile);
