@@ -352,8 +352,10 @@ static void read_avro_file()
                 float f;
                 int64_t n64;
                 int b;
-                const char *str;
+                const char *buf = NULL;
                 size_t size;
+                const void *bytesbuf = NULL;
+                size_t bytessize;
                 if (0 == avro_value_get_by_name(&value, field->name, &field_value, NULL)) {
                     if (0 == strcmp(field->type, "int")) {
                         avro_value_get_int(&field_value, &n32);
@@ -365,8 +367,11 @@ static void read_avro_file()
                         avro_value_get_long(&field_value, &n64);
                         printf("%"PRId64" | ", n64);
                     } else if (0 == strcmp(field->type, "string")) {
-                        avro_value_get_string(&field_value, &str, &size);
-                        printf("%s | ", str);
+                        avro_value_get_string(&field_value, &buf, &size);
+                        printf("%s | ", buf);
+                    } else if (0 == strcmp(field->type, "bytes")) {
+                        avro_value_get_bytes(&field_value, &bytesbuf, &bytessize);
+                        printf("%s | ", (char*)bytesbuf);
                     } else if (0 == strcmp(field->type, "boolean")) {
                         avro_value_get_boolean(&field_value, &b);
                         printf("%s | ", b?"true":"false");
@@ -411,6 +416,8 @@ static int write_record_to_file(
         if (avro_value_get_by_name(&record, field->name, &value, NULL) == 0) {
             if (0 == strcmp(field->type, "string")) {
                 avro_value_set_string(&value, word);
+            } else if (0 == strcmp(field->type, "bytes")) {
+                avro_value_set_bytes(&value, (void *)word, strlen(word));
             } else if (0 == strcmp(field->type, "long")) {
                 avro_value_set_long(&value, atol(word));
             } else if (0 == strcmp(field->type, "int")) {
