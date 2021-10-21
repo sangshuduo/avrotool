@@ -351,6 +351,7 @@ static void read_avro_file()
                 int32_t n32;
                 float f;
                 int64_t n64;
+                int b;
                 if (0 == avro_value_get_by_name(&value, field->name, &field_value, NULL)) {
                     if (0 == strcmp(field->type, "int")) {
                         avro_value_get_int(&field_value, &n32);
@@ -361,6 +362,9 @@ static void read_avro_file()
                     } else if (0 == strcmp(field->type, "long")) {
                         avro_value_get_long(&field_value, &n64);
                         printf("%"PRId64" | ", n64);
+                    } else if (0 == strcmp(field->type, "boolean")) {
+                        avro_value_get_boolean(&field_value, &b);
+                        printf("%s | ", b?"true":"false");
                     }
                 }
             }
@@ -406,6 +410,8 @@ static int write_record_to_file(
                 avro_value_set_long(&value, atol(word));
             } else if (0 == strcmp(field->type, "int")) {
                 avro_value_set_int(&value, atoi(word));
+            } else if (0 == strcmp(field->type, "boolean")) {
+                avro_value_set_boolean(&value, (atoi(word))?1:0);
             } else if (0 == strcmp(field->type, "float")) {
                 avro_value_set_float(&value, atof(word));
             }
