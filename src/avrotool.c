@@ -67,7 +67,7 @@ static void printHelp()
 
     printf("\n");
 
-    printf("%s\n\n", "avro-c usage:");
+    printf("%s\n\n", "avrotool usage:");
     printf("%s%s%s%s\n", indent, "-r\t", indent,
             "<avro filename>. print avro file's contents including schema and data.");
     printf("%s%s%s%s\n", indent, "-c\t", indent,
@@ -352,6 +352,8 @@ static void read_avro_file()
                 float f;
                 int64_t n64;
                 int b;
+                const char *str;
+                size_t size;
                 if (0 == avro_value_get_by_name(&value, field->name, &field_value, NULL)) {
                     if (0 == strcmp(field->type, "int")) {
                         avro_value_get_int(&field_value, &n32);
@@ -362,6 +364,9 @@ static void read_avro_file()
                     } else if (0 == strcmp(field->type, "long")) {
                         avro_value_get_long(&field_value, &n64);
                         printf("%"PRId64" | ", n64);
+                    } else if (0 == strcmp(field->type, "string")) {
+                        avro_value_get_string(&field_value, &str, &size);
+                        printf("%s | ", str);
                     } else if (0 == strcmp(field->type, "boolean")) {
                         avro_value_get_boolean(&field_value, &b);
                         printf("%s | ", b?"true":"false");
@@ -633,7 +638,11 @@ int main(int argc, char **argv) {
     if (g_args.read_file || g_args.schema_only) {
         read_avro_file();
     } else if (g_args.write_file) {
-        write_avro_file();
+        if (0 == write_avro_file()) {
+            printf("\nSuccess!\n");
+        } else {
+            printf("\nFailed!\n");
+        }
     }
     exit(EXIT_SUCCESS);
 }

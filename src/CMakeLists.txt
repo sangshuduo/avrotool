@@ -32,6 +32,6 @@ ELSE ()
     SET(CMAKE_C_FLAGS "-DRELEASE")
 ENDIF (${CMAKE_BUILD_TYPE} MATCHES "DEBUG")
 
-ADD_EXECUTABLE(avro-c avro-c.c)
-TARGET_LINK_LIBRARIES(avro-c PRIVATE avro jansson)
+ADD_EXECUTABLE(avrotool avrotool.c)
+TARGET_LINK_LIBRARIES(avrotool PRIVATE avro jansson)
 
