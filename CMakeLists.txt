@@ -8,3 +8,9 @@ project(avrotool
 add_subdirectory(deps)
 add_subdirectory(src)
 
+INSTALL(TARGETS avrotool
+  RUNTIME DESTINATION bin
+)
+
+install(DIRECTORY ${CMAKE_BINARY_DIR}/build/lib DESTINATION /usr/local)
+install(CODE "execute_process(COMMAND ldconfig)")
