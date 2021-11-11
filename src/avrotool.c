@@ -20,6 +20,7 @@
 typedef struct FieldStruct_S {
     char name[FIELD_NAME_LEN];
     char type[TYPE_NAME_LEN];
+    bool nullable;
 } FieldStruct;
 
 typedef struct RecordSchema_S {
@@ -37,6 +38,7 @@ typedef struct SArguments_S {
     char *write_filename;
     char *json_filename;
     char *data_filename;
+    bool debug_output;
 } SArguments;
 
 SArguments g_args = {
@@ -48,6 +50,7 @@ SArguments g_args = {
     "",             // write_filename
     "",             // json_filename
     "",             // data_filename
+    false,          // debug_output
 };
 
 
@@ -80,6 +83,8 @@ static void printHelp()
             "<json filename>. use json as schema to write data to avro file.");
     printf("%s%s%s%s\n", indent, "-d\t", indent,
             "<data filename>. use csv file as input data.");
+    printf("%s%s%s%s\n", indent, "-g\t", indent,
+            "print debug info.");
     printf("%s%s%s%s\n", indent, "--help\t", indent,
             "Print command line arguments list info.");
 
@@ -123,6 +128,8 @@ static bool parse_args(int argc, char *argv[], SArguments *arguments)
             arguments->json_filename = argv[++i];
         } else if (strcmp(argv[i], "-d") == 0) {
             arguments->data_filename = argv[++i];
+        } else if (strcmp(argv[i], "-g") == 0) {
+            arguments->debug_output = true;
         } else if (strcmp(argv[i], "--help") == 0) {
             printHelp();
             exit(0);
@@ -296,7 +303,7 @@ static void read_avro_file()
         exit(EXIT_FAILURE);
     }
     schema = avro_file_reader_get_writer_schema(reader);
-    printf("*** Schema:\n");
+    printf("=== Schema:\n");
     avro_schema_to_json(schema, stdout_writer);
     printf("\n");
 
@@ -319,10 +326,10 @@ static void read_avro_file()
         fread(jsonbuf, 1, size, jsonfile);
 
         json_root = load_json(jsonbuf);
-#ifdef DEBUG
-        printf("\n%s() LN%d\n *** Schema parsed:\n", __func__, __LINE__);
-        print_json(json_root);
-#endif
+        if (g_args.debug_output) {
+            printf("\n%s() LN%d\n === Schema parsed:\n", __func__, __LINE__);
+            print_json(json_root);
+        }
 
         recordSchema = parse_json_to_recordschema(json_root);
         if (NULL == recordSchema) {
@@ -339,7 +346,7 @@ static void read_avro_file()
     uint64_t count = 0;
 
     if (false == g_args.schema_only) {
-        printf("\n*** Records:\n");
+        printf("\n=== Records:\n");
         avro_value_iface_t *value_class = avro_generic_class_from_schema(schema);
         avro_value_t value;
         avro_generic_value_new(value_class, &value);
@@ -367,7 +374,13 @@ static void read_avro_file()
                         avro_value_get_long(&field_value, &n64);
                         printf("%"PRId64" | ", n64);
                     } else if (0 == strcmp(field->type, "string")) {
-                        avro_value_get_string(&field_value, &buf, &size);
+                        if (field->nullable) {
+                            avro_value_t branch;
+                            avro_value_get_current_branch(&field_value, &branch);
+                            avro_value_get_string(&branch, &buf, &size);
+                        } else {
+                            avro_value_get_string(&field_value, &buf, &size);
+                        }
                         printf("%s | ", buf);
                     } else if (0 == strcmp(field->type, "bytes")) {
                         avro_value_get_bytes(&field_value, &bytesbuf, &bytessize);
@@ -415,7 +428,14 @@ static int write_record_to_file(
         FieldStruct *field = (FieldStruct *)(recordSchema->fields + sizeof(FieldStruct) * i);
         if (avro_value_get_by_name(&record, field->name, &value, NULL) == 0) {
             if (0 == strcmp(field->type, "string")) {
-                avro_value_set_string(&value, word);
+                avro_value_t branch;
+                if ((field->nullable) && (0 == strcmp(word, "null"))) {
+                    avro_value_set_branch(&value, 0, &branch);
+                    avro_value_set_null(&branch);
+                } else {
+                    avro_value_set_branch(&value, 1, &branch);
+                    avro_value_set_string(&branch, word);
+                }
             } else if (0 == strcmp(field->type, "bytes")) {
                 avro_value_set_bytes(&value, (void *)word, strlen(word));
             } else if (0 == strcmp(field->type, "long")) {
@@ -444,7 +464,7 @@ static int write_record_to_file(
 
 static RecordSchema *parse_json_to_recordschema(json_t *element)
 {
-    RecordSchema *recordSchema = malloc(sizeof(RecordSchema));
+    RecordSchema *recordSchema = calloc(1, sizeof(RecordSchema));
     assert(recordSchema);
 
     if (JSON_OBJECT != json_typeof(element)) {
@@ -466,29 +486,82 @@ static RecordSchema *parse_json_to_recordschema(json_t *element)
                 size_t i;
                 size_t size = json_array_size(value);
 
-#ifdef DEBUG
-                printf("%s() LN%d, JSON Array of %lld element%s:\n",
-                        __func__, __LINE__,
-                        (long long)size, json_plural(size));
-#endif
+                if (g_args.debug_output) {
+                    printf("%s() LN%d, JSON Array of %lld element%s:\n",
+                            __func__, __LINE__,
+                            (long long)size, json_plural(size));
+                }
 
                 recordSchema->num_fields = size;
                 recordSchema->fields = malloc(sizeof(FieldStruct) * size);
                 assert(recordSchema->fields);
 
                 for (i = 0; i < size; i++) {
-                    FieldStruct *field = (FieldStruct *)(recordSchema->fields + sizeof(FieldStruct) * i);
+                    FieldStruct *field = (FieldStruct *)
+                        (recordSchema->fields + sizeof(FieldStruct) * i);
                     json_t *arr_element = json_array_get(value, i);
                     const char *ele_key;
                     json_t *ele_value;
 
                     json_object_foreach(arr_element, ele_key, ele_value) {
                         if (0 == strcmp(ele_key, "name")) {
-                            tstrncpy(field->name, json_string_value(ele_value), FIELD_NAME_LEN-1);
+                            tstrncpy(field->name,
+                                    json_string_value(ele_value),
+                                    FIELD_NAME_LEN-1);
                         } else if (0 == strcmp(ele_key, "type")) {
-                            if (JSON_STRING == json_typeof(ele_value)) {
-                                tstrncpy(field->type, json_string_value(ele_value), TYPE_NAME_LEN-1);
-                            } else if (JSON_OBJECT == json_typeof(ele_value)) {
+                            int ele_type = json_typeof(ele_value);
+
+                            if (JSON_STRING == ele_type) {
+                                tstrncpy(field->type,
+                                        json_string_value(ele_value),
+                                        TYPE_NAME_LEN-1);
+                            } else if (JSON_ARRAY == ele_type) {
+                                size_t ele_size = json_array_size(ele_value);
+
+                                for(size_t ele_i = 0; ele_i < ele_size;
+                                        ele_i ++) {
+                                    json_t *arr_type_ele =
+                                        json_array_get(ele_value, ele_i);
+
+                                    if (JSON_STRING == json_typeof(arr_type_ele)) {
+                                        const char *arr_type_ele_str =
+                                            json_string_value(arr_type_ele);
+
+                                        if(0 == strcmp(arr_type_ele_str,
+                                                            "null")) {
+                                            field->nullable = true;
+                                        } else {
+                                            tstrncpy(field->type,
+                                                    arr_type_ele_str,
+                                                    TYPE_NAME_LEN-1);
+                                        }
+                                    } else if (JSON_OBJECT ==
+                                            json_typeof(arr_type_ele)) {
+                                        const char *arr_type_ele_key;
+                                        json_t *arr_type_ele_value;
+
+                                        json_object_foreach(arr_type_ele,
+                                                arr_type_ele_key,
+                                                arr_type_ele_value) {
+                                            if (JSON_STRING ==
+                                                    json_typeof(arr_type_ele_value)) {
+                                                const char *arr_type_ele_value_str =
+                                                    json_string_value(arr_type_ele_value);
+                                                if(0 == strcmp(arr_type_ele_value_str,
+                                                            "null")) {
+                                                    field->nullable = true;
+                                                } else {
+                                                    tstrncpy(field->type,
+                                                            arr_type_ele_value_str,
+                                                            TYPE_NAME_LEN-1);
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        fprintf(stderr, "Error: not supported!\n");
+                                    }
+                                }
+                            } else if (JSON_OBJECT == ele_type) {
                                 size_t obj_size;
                                 const char *obj_key;
                                 json_t *obj_value;
@@ -500,6 +573,19 @@ static RecordSchema *parse_json_to_recordschema(json_t *element)
                                         if (JSON_STRING == json_typeof(obj_value)) {
                                             tstrncpy(field->type,
                                                     json_string_value(obj_value), TYPE_NAME_LEN-1);
+                                        } else if (JSON_OBJECT == json_typeof(obj_value)) {
+                                            const char *field_key;
+                                            json_t *field_value;
+
+                                            json_object_foreach(obj_value, field_key, field_value) {
+                                                if (JSON_STRING == json_typeof(field_value)) {
+                                                    tstrncpy(field->type,
+                                                            json_string_value(field_value),
+                                                            TYPE_NAME_LEN-1);
+                                                } else {
+                                                    field->nullable = true;
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -543,9 +629,9 @@ static int write_avro_file()
     fseek(fp, 0, SEEK_SET);
     fread(jsonbuf, 1, size, fp);
 
-#ifdef DEBUG
-    printf("%s() LN%d\n *** json content:\n%s\n", __func__, __LINE__, jsonbuf);
-#endif
+    if (g_args.debug_output) {
+        printf("%s() LN%d\n === json content:\n%s\n", __func__, __LINE__, jsonbuf);
+    }
 
     avro_schema_t schema;
     if (avro_schema_from_json_length(jsonbuf, strlen(jsonbuf), &schema)) {
@@ -557,15 +643,23 @@ static int write_avro_file()
         exit(EXIT_FAILURE);
     }
 
+    if (g_args.debug_output) {
+        avro_writer_t stdout_writer = avro_writer_file_fp(stdout, 1);
+        printf("=== convert Schema back to json:\n");
+        avro_schema_to_json(schema, stdout_writer);
+        printf("\n");
+        avro_writer_free(stdout_writer);
+    }
+
     json_t *json_root = load_json(jsonbuf);
     free(jsonbuf);
 
     RecordSchema *recordSchema;
 
     if (json_root) {
-#ifdef DEBUG
-        print_json(json_root);
-#endif
+        if (g_args.debug_output) {
+            print_json(json_root);
+        }
 
         recordSchema = parse_json_to_recordschema(json_root);
 
@@ -616,9 +710,9 @@ static int write_avro_file()
         readLen = getline(&line, &n, fd);
 
         if (readLen != -1) {
-#ifdef DEBUG
-            printf("%s", line);
-#endif
+            if (g_args.debug_output) {
+                printf("%s", line);
+            }
             write_record_to_file(db, line, &schema, recordSchema);
         }
     }
