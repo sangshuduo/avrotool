@@ -383,7 +383,13 @@ static void read_avro_file()
                         }
                         printf("%s | ", buf);
                     } else if (0 == strcmp(field->type, "bytes")) {
-                        avro_value_get_bytes(&field_value, &bytesbuf, &bytessize);
+                        if (field->nullable) {
+                            avro_value_t branch;
+                            avro_value_get_current_branch(&field_value, &branch);
+                            avro_value_get_bytes(&branch, &bytesbuf, &bytessize);
+                        } else {
+                            avro_value_get_bytes(&field_value, &bytesbuf, &bytessize);
+                        }
                         printf("%s | ", (char*)bytesbuf);
                     } else if (0 == strcmp(field->type, "boolean")) {
                         avro_value_get_boolean(&field_value, &b);
