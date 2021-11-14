@@ -54,6 +54,33 @@ SArguments g_args = {
 };
 
 
+#define debugPrint(fmt, ...) \
+    do { if (g_args.debug_print || g_args.verbose_print) \
+      fprintf(stderr, "DEBG: "fmt, __VA_ARGS__); } while(0)
+
+#define verbosePrint(fmt, ...) \
+    do { if (g_args.verbose_print) \
+        fprintf(stderr, "VERB: "fmt, __VA_ARGS__); } while(0)
+
+#define performancePrint(fmt, ...) \
+    do { if (g_args.performance_print) \
+        fprintf(stderr, "PERF: "fmt, __VA_ARGS__); } while(0)
+
+#define warnPrint(fmt, ...) \
+    do { fprintf(stderr, "\033[33m"); \
+        fprintf(stderr, "WARN: "fmt, __VA_ARGS__); \
+        fprintf(stderr, "\033[0m"); } while(0)
+
+#define errorPrint(fmt, ...) \
+    do { fprintf(stderr, "\033[31m"); \
+        fprintf(stderr, "ERROR: "fmt, __VA_ARGS__); \
+        fprintf(stderr, "\033[0m"); } while(0)
+
+#define okPrint(fmt, ...) \
+    do { fprintf(stderr, "\033[32m"); \
+        fprintf(stderr, "OK: "fmt, __VA_ARGS__); \
+        fprintf(stderr, "\033[0m"); } while(0)
+
 #define tstrncpy(dst, src, size) \
   do {                              \
     strncpy((dst), (src), (size));  \
@@ -443,7 +470,14 @@ static int write_record_to_file(
                     avro_value_set_string(&branch, word);
                 }
             } else if (0 == strcmp(field->type, "bytes")) {
-                avro_value_set_bytes(&value, (void *)word, strlen(word));
+                avro_value_t branch;
+                if ((field->nullable) && (0 == strcmp(word, "null"))) {
+                    avro_value_set_branch(&value, 0, &branch);
+                    avro_value_set_null(&branch);
+                } else {
+                    avro_value_set_branch(&value, 1, &branch);
+                    avro_value_set_bytes(&branch, (void *)word, strlen(word));
+                }
             } else if (0 == strcmp(field->type, "long")) {
                 avro_value_set_long(&value, atol(word));
             } else if (0 == strcmp(field->type, "int")) {
@@ -623,7 +657,7 @@ static int write_avro_file()
 
     FILE *fp = fopen(g_args.json_filename, "r");
     if (NULL == fp) {
-        fprintf(stderr, "Failed to open %s\n", g_args.json_filename);
+        errorPrint("Failed to open %s\n", g_args.json_filename);
         exit(EXIT_FAILURE);
     }
 
@@ -671,7 +705,7 @@ static int write_avro_file()
 
         if (NULL == recordSchema) {
             fclose(fp);
-            fprintf(stderr, "Failed to parse json to recordschema\n");
+            errorPrint("%s", "Failed to parse json to recordschema\n");
             exit(EXIT_FAILURE);
         }
 
@@ -701,7 +735,7 @@ static int write_avro_file()
     FILE *fd = fopen(g_args.data_filename, "r");
     if (NULL == fd) {
         freeRecordSchema(recordSchema);
-        fprintf(stderr, "Failed to open %s\n", g_args.data_filename);
+        errorPrint("Failed to open %s\n", g_args.data_filename);
         fclose(fp);
         exit(EXIT_FAILURE);
     }
@@ -746,11 +780,12 @@ int main(int argc, char **argv) {
         read_avro_file();
     } else if (g_args.write_file) {
         if (0 == write_avro_file()) {
-            printf("\nSuccess!\n");
+            okPrint("%s", "Success!\n");
         } else {
-            printf("\nFailed!\n");
+            errorPrint("%s", "Failed!\n");
         }
     }
+    fflush(stdout);
     exit(EXIT_SUCCESS);
 }
 
