@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <limits.h>
 #include <ctype.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -21,6 +22,8 @@ typedef struct FieldStruct_S {
     char name[FIELD_NAME_LEN];
     char type[TYPE_NAME_LEN];
     bool nullable;
+    bool is_array;
+    char array_type[TYPE_NAME_LEN];
 } FieldStruct;
 
 typedef struct RecordSchema_S {
@@ -274,7 +277,7 @@ static void print_json_aux(json_t *element, int indent)
             break;
 
         default:
-            fprintf(stderr, "unrecongnized JSON type %d\n", json_typeof(element));
+            errorPrint("unrecongnized JSON type %d\n", json_typeof(element));
     }
 }
 
@@ -290,7 +293,7 @@ static json_t *load_json(char *jsonbuf)
     if (root) {
         return root;
     } else {
-        fprintf(stderr, "json error on line %d: %s\n", error.line, error.text);
+        errorPrint("json error on line %d: %s\n", error.line, error.text);
         return NULL;
     }
 }
@@ -325,7 +328,7 @@ static void read_avro_file()
     char *json=NULL;
 
     if(avro_file_reader(g_args.read_filename, &reader)) {
-        fprintf(stderr, "Unable to open avro file %s: %s\n",
+        errorPrint("Unable to open avro file %s: %s\n",
                 g_args.read_filename, avro_strerror());
         exit(EXIT_FAILURE);
     }
@@ -339,7 +342,7 @@ static void read_avro_file()
     json_t *json_root = NULL;
     RecordSchema *recordSchema = NULL;
 
-        printf("%d reocrdschema=%p\n", __LINE__, recordSchema);
+    printf("%d reocrdschema=%p\n", __LINE__, recordSchema);
     if (jsonfile) {
         jsonfile_writer = avro_writer_file_fp(jsonfile, 0);
         avro_schema_to_json(schema, jsonfile_writer);
@@ -361,7 +364,7 @@ static void read_avro_file()
         recordSchema = parse_json_to_recordschema(json_root);
         if (NULL == recordSchema) {
             fclose(jsonfile);
-            fprintf(stderr, "Failed to parse json to recordschema\n");
+            errorPrint("%s", "Failed to parse json to recordschema\n");
             exit(EXIT_FAILURE);
         }
 
@@ -403,7 +406,8 @@ static void read_avro_file()
                     } else if (0 == strcmp(field->type, "string")) {
                         if (field->nullable) {
                             avro_value_t branch;
-                            avro_value_get_current_branch(&field_value, &branch);
+                            avro_value_get_current_branch(&field_value,
+                                    &branch);
                             avro_value_get_string(&branch, &buf, &size);
                         } else {
                             avro_value_get_string(&field_value, &buf, &size);
@@ -412,15 +416,36 @@ static void read_avro_file()
                     } else if (0 == strcmp(field->type, "bytes")) {
                         if (field->nullable) {
                             avro_value_t branch;
-                            avro_value_get_current_branch(&field_value, &branch);
-                            avro_value_get_bytes(&branch, &bytesbuf, &bytessize);
+                            avro_value_get_current_branch(&field_value,
+                                    &branch);
+                            avro_value_get_bytes(&branch, &bytesbuf,
+                                    &bytessize);
                         } else {
-                            avro_value_get_bytes(&field_value, &bytesbuf, &bytessize);
+                            avro_value_get_bytes(&field_value, &bytesbuf,
+                                    &bytessize);
                         }
                         printf("%s | ", (char*)bytesbuf);
                     } else if (0 == strcmp(field->type, "boolean")) {
                         avro_value_get_boolean(&field_value, &b);
                         printf("%s | ", b?"true":"false");
+                    } else if (0 == strcmp(field->type, "array")) {
+                        size_t array_size;
+                        avro_value_get_size(&field_value, &array_size);
+
+                        if (0 == strcmp(field->array_type, "int")) {
+                            unsigned long array_n32 = 0;
+                            for (size_t item = 0; item < array_size; item ++) {
+                                avro_value_t item_value;
+                                avro_value_get_by_index(&field_value, item,
+                                        &item_value, NULL);
+                                avro_value_get_int(&item_value, &n32);
+                                array_n32 += n32;
+                            }
+                            printf("%u | ", (uint32_t)array_n32);
+                        } else {
+                            errorPrint("%s is not supported!\n",
+                                    field->array_type);
+                        }
                     }
                 }
             }
@@ -458,6 +483,7 @@ static int write_record_to_file(
         word = strsep(&line, ",");
 
         avro_value_t value;
+        avro_value_t intv1, intv2;
         FieldStruct *field = (FieldStruct *)(recordSchema->fields + sizeof(FieldStruct) * i);
         if (avro_value_get_by_name(&record, field->name, &value, NULL) == 0) {
             if (0 == strcmp(field->type, "string")) {
@@ -486,12 +512,22 @@ static int write_record_to_file(
                 avro_value_set_boolean(&value, (atoi(word))?1:0);
             } else if (0 == strcmp(field->type, "float")) {
                 avro_value_set_float(&value, atof(word));
+            } else if (0 == strcmp(field->type, "array")) {
+                if (0 == strcmp(field->array_type, "int")) {
+                    avro_value_append(&value, &intv1, NULL);
+                    unsigned long ultemp;
+                    char *eptr;
+                    ultemp = strtoul(word, &eptr, strlen(word));
+                    avro_value_set_int(&intv1, (int32_t)(ultemp - INT_MAX));
+                    avro_value_append(&value, &intv2, NULL);
+                    avro_value_set_int(&intv2, INT_MAX);
+                }
             }
         }
     }
 
     if (avro_file_writer_append_value(db, &record)) {
-        fprintf(stderr,
+        errorPrint(
                 "%s() LN%d, Unable to write record to file. Message: %s",
                 __func__, __LINE__,
                 avro_strerror());
@@ -508,7 +544,7 @@ static RecordSchema *parse_json_to_recordschema(json_t *element)
     assert(recordSchema);
 
     if (JSON_OBJECT != json_typeof(element)) {
-        fprintf(stderr, "%s() LN%d, json passed is not an object\n",
+        errorPrint("%s() LN%d, json passed is not an object\n",
                 __func__, __LINE__);
         return NULL;
     }
@@ -598,7 +634,7 @@ static RecordSchema *parse_json_to_recordschema(json_t *element)
                                             }
                                         }
                                     } else {
-                                        fprintf(stderr, "Error: not supported!\n");
+                                        errorPrint("%s", "Error: not supported!\n");
                                     }
                                 }
                             } else if (JSON_OBJECT == ele_type) {
@@ -610,10 +646,14 @@ static RecordSchema *parse_json_to_recordschema(json_t *element)
 
                                 json_object_foreach(ele_value, obj_key, obj_value) {
                                     if (0 == strcmp(obj_key, "type")) {
-                                        if (JSON_STRING == json_typeof(obj_value)) {
+                                        int obj_value_type = json_typeof(obj_value);
+                                        if (JSON_STRING == obj_value_type) {
                                             tstrncpy(field->type,
                                                     json_string_value(obj_value), TYPE_NAME_LEN-1);
-                                        } else if (JSON_OBJECT == json_typeof(obj_value)) {
+                                            if (0 == strcmp(field->type, "array")) {
+                                                field->is_array = true;
+                                            }
+                                        } else if (JSON_OBJECT == obj_value_type) {
                                             const char *field_key;
                                             json_t *field_value;
 
@@ -627,6 +667,24 @@ static RecordSchema *parse_json_to_recordschema(json_t *element)
                                                 }
                                             }
                                         }
+                                    } else if (0 == strcmp(obj_key, "items")) {
+                                        int obj_value_items = json_typeof(obj_value);
+                                        if (JSON_STRING == obj_value_items) {
+                                            field->is_array = true;
+                                            tstrncpy(field->array_type,
+                                                    json_string_value(obj_value), TYPE_NAME_LEN-1);
+                                        } else if (JSON_OBJECT == obj_value_items) {
+                                            const char *item_key;
+                                            json_t *item_value;
+
+                                            json_object_foreach(obj_value, item_key, item_value) {
+                                                if (JSON_STRING == json_typeof(item_value)) {
+                                                    tstrncpy(field->array_type,
+                                                            json_string_value(item_value),
+                                                            TYPE_NAME_LEN-1);
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -634,7 +692,7 @@ static RecordSchema *parse_json_to_recordschema(json_t *element)
                     }
                 }
             } else {
-                fprintf(stderr, "%s() LN%d, fields have no array\n",
+                errorPrint("%s() LN%d, fields have no array\n",
                         __func__, __LINE__);
                 return NULL;
             }
@@ -675,8 +733,8 @@ static int write_avro_file()
 
     avro_schema_t schema;
     if (avro_schema_from_json_length(jsonbuf, strlen(jsonbuf), &schema)) {
-        fprintf(stderr, "Unable to parse schema\n");
-        fprintf(stderr, "%s() LN%d, error message: %s\n",
+        errorPrint("%s", "Unable to parse schema\n");
+        errorPrint("%s() LN%d, error message: %s\n",
                 __func__, __LINE__, avro_strerror());
         fclose(fp);
         free(jsonbuf);
@@ -712,7 +770,7 @@ static int write_avro_file()
         json_decref(json_root);
     } else {
         fclose(fp);
-        fprintf(stderr, "json can't be parsed by jansson\n");
+        errorPrint("%s", "json can't be parsed by jansson\n");
         exit(EXIT_FAILURE);
     }
 
@@ -725,8 +783,8 @@ static int write_avro_file()
     if (rval) {
         freeRecordSchema(recordSchema);
         fclose(fp);
-        fprintf(stderr, "There was an error creating %s\n", g_args.write_filename);
-        fprintf(stderr, "%s() LN%d, error message: %s\n",
+        errorPrint("There was an error creating %s\n", g_args.write_filename);
+        errorPrint("%s() LN%d, error message: %s\n",
                 __func__, __LINE__,
                 avro_strerror());
         exit(EXIT_FAILURE);
