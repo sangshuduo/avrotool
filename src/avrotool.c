@@ -483,7 +483,6 @@ static int write_record_to_file(
         word = strsep(&line, ",");
 
         avro_value_t value;
-        avro_value_t intv1, intv2;
         FieldStruct *field = (FieldStruct *)(recordSchema->fields + sizeof(FieldStruct) * i);
         if (avro_value_get_by_name(&record, field->name, &value, NULL) == 0) {
             if (0 == strcmp(field->type, "string")) {
@@ -514,10 +513,11 @@ static int write_record_to_file(
                 avro_value_set_float(&value, atof(word));
             } else if (0 == strcmp(field->type, "array")) {
                 if (0 == strcmp(field->array_type, "int")) {
-                    avro_value_append(&value, &intv1, NULL);
+                    avro_value_t intv1, intv2;
                     unsigned long ultemp;
                     char *eptr;
                     ultemp = strtoul(word, &eptr, strlen(word));
+                    avro_value_append(&value, &intv1, NULL);
                     avro_value_set_int(&intv1, (int32_t)(ultemp - INT_MAX));
                     avro_value_append(&value, &intv2, NULL);
                     avro_value_set_int(&intv2, INT_MAX);
