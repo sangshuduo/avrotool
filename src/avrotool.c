@@ -638,11 +638,8 @@ static RecordSchema *parse_json_to_recordschema(json_t *element)
                                     }
                                 }
                             } else if (JSON_OBJECT == ele_type) {
-                                size_t obj_size;
                                 const char *obj_key;
                                 json_t *obj_value;
-
-                                obj_size = json_object_size(ele_value);
 
                                 json_object_foreach(ele_value, obj_key, obj_value) {
                                     if (0 == strcmp(obj_key, "type")) {
