@@ -433,15 +433,15 @@ static void read_avro_file()
                         avro_value_get_size(&field_value, &array_size);
 
                         if (0 == strcmp(field->array_type, "int")) {
-                            unsigned long array_n32 = 0;
+                            uint32_t array_u32 = 0;
                             for (size_t item = 0; item < array_size; item ++) {
                                 avro_value_t item_value;
                                 avro_value_get_by_index(&field_value, item,
                                         &item_value, NULL);
                                 avro_value_get_int(&item_value, &n32);
-                                array_n32 += n32;
+                                array_u32 += n32;
                             }
-                            printf("%u | ", (uint32_t)array_n32);
+                            printf("%u | ", array_u32);
                         } else {
                             errorPrint("%s is not supported!\n",
                                     field->array_type);
