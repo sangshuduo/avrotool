@@ -58,7 +58,7 @@ SArguments g_args = {
 
 
 #define debugPrint(fmt, ...) \
-    do { if (g_args.debug_print || g_args.verbose_print) \
+    do { if (g_args.debug_output) \
       fprintf(stderr, "DEBG: "fmt, __VA_ARGS__); } while(0)
 
 #define verbosePrint(fmt, ...) \
@@ -432,6 +432,7 @@ static void read_avro_file()
                         size_t array_size;
                         avro_value_get_size(&field_value, &array_size);
 
+                        debugPrint("array_size is %d\n", (int) array_size);
                         if (0 == strcmp(field->array_type, "int")) {
                             uint32_t array_u32 = 0;
                             for (size_t item = 0; item < array_size; item ++) {
@@ -569,7 +570,7 @@ static RecordSchema *parse_json_to_recordschema(json_t *element)
                 }
 
                 recordSchema->num_fields = size;
-                recordSchema->fields = malloc(sizeof(FieldStruct) * size);
+                recordSchema->fields = calloc(1, sizeof(FieldStruct) * size);
                 assert(recordSchema->fields);
 
                 for (i = 0; i < size; i++) {
