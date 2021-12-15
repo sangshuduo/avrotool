@@ -387,6 +387,7 @@ static void read_avro_file()
                 avro_value_t field_value;
                 int32_t n32;
                 float f;
+                double dbl;
                 int64_t n64;
                 int b;
                 const char *buf = NULL;
@@ -400,6 +401,9 @@ static void read_avro_file()
                     } else if (0 == strcmp(field->type, "float")) {
                         avro_value_get_float(&field_value, &f);
                         printf("%f | ", f);
+                    } else if (0 == strcmp(field->type, "double")) {
+                        avro_value_get_double(&field_value, &dbl);
+                        printf("%f | ", dbl);
                     } else if (0 == strcmp(field->type, "long")) {
                         avro_value_get_long(&field_value, &n64);
                         printf("%"PRId64" | ", n64);
