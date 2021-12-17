@@ -342,7 +342,8 @@ static void read_avro_file()
     json_t *json_root = NULL;
     RecordSchema *recordSchema = NULL;
 
-    printf("%d reocrdschema=%p\n", __LINE__, recordSchema);
+    debugPrint("%s() LN%d reocrdschema=%p\n",
+            __func__, __LINE__, recordSchema);
     if (jsonfile) {
         jsonfile_writer = avro_writer_file_fp(jsonfile, 0);
         avro_schema_to_json(schema, jsonfile_writer);
