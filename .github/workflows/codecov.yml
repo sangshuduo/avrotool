@@ -1,8 +1,8 @@
-- name: Codecov
-  on: [push, pull_request]
-  jobs:
-    run:
-      runs-on: ubuntu-latest
+name: Codecov
+on: [push, pull_request]
+jobs:
+  run:
+    runs-on: ubuntu-latest
     steps:
       - name: Fetch
         uses: actions/checkout@develop
