@@ -1,2 +1,22 @@
 - name: Codecov
+  on: [push, pull_request]
+  jobs:
+    run:
+      runs-on: ubuntu-latest
+    steps:
+      - name: Fetch
+        uses: actions/checkout@develop
+      - name: Test
+        run: |
+          mkdir debug
+          cd debug
+          cmake .. -DCOVER=true
+          make
+          ./build/bin/avrotool -w ../out.avro -m ../sampledata/schema.json -d ../sampledata.csv
+          ./build/bin/avrotool -r ../out.avro
+          gcov -abcfu ../src/avrotool.c -o src/CMakeFiles/avrotool.dir/avrotool.c.gcno
+      - name: Upload
   uses: codecov/codecov-action@v2.1.0
+  with:
+    files: debug/avrotool.c.gcov
+    token: ${{ secrets.CODECOV_TOKEN }}
