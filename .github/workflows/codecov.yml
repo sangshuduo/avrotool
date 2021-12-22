@@ -19,7 +19,7 @@ jobs:
           cd debug
           cmake .. -DCOVER=true
           make
-          ./build/bin/avrotool -w ../out.avro -m ../sampledata/schema.json -d ../sampledata.csv
+          ./build/bin/avrotool -w ../out.avro -m ../sampledata/schema.json -d ../sampledata/data.csv
           ./build/bin/avrotool -r ../out.avro
           gcov -abcfu ../src/avrotool.c -o src/CMakeFiles/avrotool.dir/avrotool.c.gcno
       - name: Upload
