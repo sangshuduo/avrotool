@@ -398,16 +398,16 @@ static void read_avro_file()
                 if (0 == avro_value_get_by_name(&value, field->name, &field_value, NULL)) {
                     if (0 == strcmp(field->type, "int")) {
                         avro_value_get_int(&field_value, &n32);
-                        printf("%d | ", n32);
+                        printf("%d |\t", n32);
                     } else if (0 == strcmp(field->type, "float")) {
                         avro_value_get_float(&field_value, &f);
-                        printf("%f | ", f);
+                        printf("%f |\t", f);
                     } else if (0 == strcmp(field->type, "double")) {
                         avro_value_get_double(&field_value, &dbl);
-                        printf("%f | ", dbl);
+                        printf("%f |\t", dbl);
                     } else if (0 == strcmp(field->type, "long")) {
                         avro_value_get_long(&field_value, &n64);
-                        printf("%"PRId64" | ", n64);
+                        printf("%"PRId64" |\t", n64);
                     } else if (0 == strcmp(field->type, "string")) {
                         if (field->nullable) {
                             avro_value_t branch;
@@ -417,7 +417,7 @@ static void read_avro_file()
                         } else {
                             avro_value_get_string(&field_value, &buf, &size);
                         }
-                        printf("%s | ", buf);
+                        printf("%s |\t", buf);
                     } else if (0 == strcmp(field->type, "bytes")) {
                         if (field->nullable) {
                             avro_value_t branch;
@@ -429,10 +429,22 @@ static void read_avro_file()
                             avro_value_get_bytes(&field_value, &bytesbuf,
                                     &bytessize);
                         }
-                        printf("%s | ", (char*)bytesbuf);
+                        printf("%s |\t", (char*)bytesbuf);
                     } else if (0 == strcmp(field->type, "boolean")) {
-                        avro_value_get_boolean(&field_value, &b);
-                        printf("%s | ", b?"true":"false");
+                        if (field->nullable) {
+                            avro_value_t bool_branch;
+                            avro_value_get_current_branch(&field_value,
+                                    &bool_branch);
+                            if (0 == avro_value_get_null(&bool_branch)) {
+                                printf("%s |\t", "null");
+                            } else {
+                                avro_value_get_boolean(&bool_branch, &b);
+                                printf("%s |\t", b?"true":"false");
+                            }
+                        } else {
+                            avro_value_get_boolean(&field_value, &b);
+                            printf("%s |\t", b?"true":"false");
+                        }
                     } else if (0 == strcmp(field->type, "array")) {
                         size_t array_size;
                         avro_value_get_size(&field_value, &array_size);
@@ -447,7 +459,7 @@ static void read_avro_file()
                                 avro_value_get_int(&item_value, &n32);
                                 array_u32 += n32;
                             }
-                            printf("%u | ", array_u32);
+                            printf("%u |\t", array_u32);
                         } else {
                             errorPrint("%s is not supported!\n",
                                     field->array_type);
@@ -514,7 +526,14 @@ static int write_record_to_file(
             } else if (0 == strcmp(field->type, "int")) {
                 avro_value_set_int(&value, atoi(word));
             } else if (0 == strcmp(field->type, "boolean")) {
-                avro_value_set_boolean(&value, (atoi(word))?1:0);
+                avro_value_t bool_branch;
+                if (0 == strcmp(word, "null")) {
+                    avro_value_set_branch(&value, 0, &bool_branch);
+                    avro_value_set_null(&bool_branch);
+                } else {
+                    avro_value_set_branch(&value, 1, &bool_branch);
+                    avro_value_set_boolean(&bool_branch, (atoi(word))?1:0);
+                }
             } else if (0 == strcmp(field->type, "float")) {
                 avro_value_set_float(&value, atof(word));
             } else if (0 == strcmp(field->type, "array")) {
