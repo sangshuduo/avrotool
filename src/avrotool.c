@@ -398,7 +398,11 @@ static void read_avro_file()
                 if (0 == avro_value_get_by_name(&value, field->name, &field_value, NULL)) {
                     if (0 == strcmp(field->type, "int")) {
                         avro_value_get_int(&field_value, &n32);
-                        printf("%d |\t", n32);
+                        if (n32 == -2147483648) {
+                            printf("null |\t");
+                        } else {
+                            printf("%d |\t", n32);
+                        }
                     } else if (0 == strcmp(field->type, "float")) {
                         avro_value_get_float(&field_value, &f);
                         printf("%f |\t", f);
