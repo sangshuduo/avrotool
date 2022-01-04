@@ -472,6 +472,11 @@ static void read_avro_file()
                 }
             }
             printf("\n");
+
+            count ++;
+            if (count == g_args.count) {
+                break;
+            }
         }
 
         avro_value_decref(&value);
