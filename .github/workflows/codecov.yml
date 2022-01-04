@@ -28,10 +28,12 @@ jobs:
           # case 3
           ./build/bin/avrotool -r ../out.avro -g -c 5
           # case 4
-          ./build/bin/avrotool -w ../failure.avro -d ../sampledata/schema.json -m ../sampledata/data.csv -g || :
+          ./build/bin/avrotool -s ../out.avro -g
           # case 5
-          ./build/bin/avrotool -w /bin/dmesg -m ../sampledata/schema.json -d ../sampledata/data.csv || :
+          ./build/bin/avrotool -w ../failure.avro -d ../sampledata/schema.json -m ../sampledata/data.csv -g || :
           # case 6
+          ./build/bin/avrotool -w /bin/dmesg -m ../sampledata/schema.json -d ../sampledata/data.csv || :
+          # case 7
           ./build/bin/avrotool -r /bin/dmesg -g || :
 
           gcov -abcfu ../src/avrotool.c -o src/CMakeFiles/avrotool.dir/avrotool.c.gcno
