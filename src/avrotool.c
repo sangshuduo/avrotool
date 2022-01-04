@@ -558,12 +558,16 @@ static int write_record_to_file(
             } else if (0 == strcmp(field->type, "long")) {
                 avro_value_set_long(&value, atol(word));
             } else if (0 == strcmp(field->type, "int")) {
-                if ((field->nullable) && (0 == strcmp(word, "null"))) {
-                    avro_value_set_branch(&value, 0, &branch);
-                    avro_value_set_null(&branch);
+                if (field->nullable) {
+                    if (0 == strcmp(word, "null")) {
+                        avro_value_set_branch(&value, 0, &branch);
+                        avro_value_set_null(&branch);
+                    } else {
+                        avro_value_set_branch(&value, 1, &branch);
+                        avro_value_set_int(&branch, atoi(word));
+                    }
                 } else {
-                    avro_value_set_branch(&value, 1, &branch);
-                    avro_value_set_int(&branch, atoi(word));
+                    avro_value_set_int(&value, atoi(word));
                 }
             } else if (0 == strcmp(field->type, "boolean")) {
                 if (0 == strcmp(word, "null")) {
@@ -574,12 +578,16 @@ static int write_record_to_file(
                     avro_value_set_boolean(&branch, (atoi(word))?1:0);
                 }
             } else if (0 == strcmp(field->type, "float")) {
-                if ((field->nullable) && (0 == strcmp(word, "null"))) {
-                    avro_value_set_branch(&value, 0, &branch);
-                    avro_value_set_null(&branch);
+                if (field->nullable) {
+                    if (0 == strcmp(word, "null")) {
+                        avro_value_set_branch(&value, 0, &branch);
+                        avro_value_set_null(&branch);
+                    } else {
+                        avro_value_set_branch(&value, 1, &branch);
+                        avro_value_set_float(&branch, atof(word));
+                    }
                 } else {
-                    avro_value_set_branch(&value, 1, &branch);
-                    avro_value_set_float(&branch, atof(word));
+                    avro_value_set_float(&value, atof(word));
                 }
             } else if (0 == strcmp(field->type, "array")) {
                 if (0 == strcmp(field->array_type, "int")) {
