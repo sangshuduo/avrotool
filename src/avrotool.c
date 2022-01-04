@@ -298,16 +298,6 @@ static json_t *load_json(char *jsonbuf)
     }
 }
 
-static void print_json_by_jansson(char *jsonbuf)
-{
-    json_t *root = load_json(jsonbuf);
-
-    if (root) {
-        print_json(root);
-        json_decref(root);
-    }
-}
-
 static void freeRecordSchema(RecordSchema *recordSchema)
 {
     if (recordSchema) {
@@ -464,6 +454,16 @@ static void read_avro_file()
                                 array_u32 += n32;
                             }
                             printf("%u |\t", array_u32);
+                        } else if (0 == strcmp(field->array_type, "long")) {
+                            uint64_t array_u64 = 0;
+                            for (size_t item = 0; item < array_size; item ++) {
+                                avro_value_t item_value;
+                                avro_value_get_by_index(&field_value, item,
+                                        &item_value, NULL);
+                                avro_value_get_long(&item_value, &n64);
+                                array_u64 += n64;
+                            }
+                            printf("%"PRIu64" |\t", array_u64);
                         } else {
                             errorPrint("%s is not supported!\n",
                                     field->array_type);
@@ -545,11 +545,25 @@ static int write_record_to_file(
                     avro_value_t intv1, intv2;
                     unsigned long ultemp;
                     char *eptr;
-                    ultemp = strtoul(word, &eptr, strlen(word));
+                    ultemp = strtoul(word, &eptr, 10);
                     avro_value_append(&value, &intv1, NULL);
                     avro_value_set_int(&intv1, (int32_t)(ultemp - INT_MAX));
                     avro_value_append(&value, &intv2, NULL);
                     avro_value_set_int(&intv2, INT_MAX);
+                } else if (0 == strcmp(field->array_type, "long")) {
+                    avro_value_t longv1, longv2;
+                    unsigned long long int ulltemp;
+                    char *eptr;
+                    ulltemp = strtoull(word, &eptr, 10);
+                    if ( errno || (!ulltemp && word == NULL) ) {
+                        fflush(stdout); // Don't cross the streams!
+                        perror(word);
+//                        exit(EXIT_FAILURE);
+                    }
+                    avro_value_append(&value, &longv1, NULL);
+                    avro_value_set_long(&longv1, (int64_t)(ulltemp - LONG_MAX));
+                    avro_value_append(&value, &longv2, NULL);
+                    avro_value_set_long(&longv2, LONG_MAX);
                 }
             }
         }
