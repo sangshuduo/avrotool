@@ -391,15 +391,35 @@ static int read_avro_file()
                 size_t bytessize;
                 if (0 == avro_value_get_by_name(&value, field->name, &field_value, NULL)) {
                     if (0 == strcmp(field->type, "int")) {
-                        avro_value_get_int(&field_value, &n32);
-                        if (n32 == -2147483648) {
-                            printf("null |\t");
+                        if (field->nullable) {
+                            avro_value_t branch;
+                            avro_value_get_current_branch(&field_value,
+                                    &branch);
+                            if (0 == avro_value_get_null(&branch)) {
+                                printf("%s |\t", "null");
+                            } else {
+                                avro_value_get_int(&branch, &n32);
+                                printf("%d |\t", n32);
+                            }
                         } else {
+                            avro_value_get_int(&field_value, &n32);
                             printf("%d |\t", n32);
                         }
                     } else if (0 == strcmp(field->type, "float")) {
-                        avro_value_get_float(&field_value, &f);
-                        printf("%f |\t", f);
+                        if (field->nullable) {
+                            avro_value_t branch;
+                            avro_value_get_current_branch(&field_value,
+                                    &branch);
+                            if (0 == avro_value_get_null(&branch)) {
+                                printf("%s |\t", "null");
+                            } else {
+                                avro_value_get_float(&branch, &f);
+                                printf("%f |\t", f);
+                            }
+                        } else {
+                            avro_value_get_float(&field_value, &f);
+                            printf("%f |\t", f);
+                        }
                     } else if (0 == strcmp(field->type, "double")) {
                         avro_value_get_double(&field_value, &dbl);
                         printf("%f |\t", dbl);
@@ -517,9 +537,9 @@ static int write_record_to_file(
 
         avro_value_t value;
         FieldStruct *field = (FieldStruct *)(recordSchema->fields + sizeof(FieldStruct) * i);
+        avro_value_t branch;
         if (avro_value_get_by_name(&record, field->name, &value, NULL) == 0) {
             if (0 == strcmp(field->type, "string")) {
-                avro_value_t branch;
                 if ((field->nullable) && (0 == strcmp(word, "null"))) {
                     avro_value_set_branch(&value, 0, &branch);
                     avro_value_set_null(&branch);
@@ -528,7 +548,6 @@ static int write_record_to_file(
                     avro_value_set_string(&branch, word);
                 }
             } else if (0 == strcmp(field->type, "bytes")) {
-                avro_value_t branch;
                 if ((field->nullable) && (0 == strcmp(word, "null"))) {
                     avro_value_set_branch(&value, 0, &branch);
                     avro_value_set_null(&branch);
@@ -539,18 +558,29 @@ static int write_record_to_file(
             } else if (0 == strcmp(field->type, "long")) {
                 avro_value_set_long(&value, atol(word));
             } else if (0 == strcmp(field->type, "int")) {
-                avro_value_set_int(&value, atoi(word));
-            } else if (0 == strcmp(field->type, "boolean")) {
-                avro_value_t bool_branch;
-                if (0 == strcmp(word, "null")) {
-                    avro_value_set_branch(&value, 0, &bool_branch);
-                    avro_value_set_null(&bool_branch);
+                if ((field->nullable) && (0 == strcmp(word, "null"))) {
+                    avro_value_set_branch(&value, 0, &branch);
+                    avro_value_set_null(&branch);
                 } else {
-                    avro_value_set_branch(&value, 1, &bool_branch);
-                    avro_value_set_boolean(&bool_branch, (atoi(word))?1:0);
+                    avro_value_set_branch(&value, 1, &branch);
+                    avro_value_set_int(&branch, atoi(word));
+                }
+            } else if (0 == strcmp(field->type, "boolean")) {
+                if (0 == strcmp(word, "null")) {
+                    avro_value_set_branch(&value, 0, &branch);
+                    avro_value_set_null(&branch);
+                } else {
+                    avro_value_set_branch(&value, 1, &branch);
+                    avro_value_set_boolean(&branch, (atoi(word))?1:0);
                 }
             } else if (0 == strcmp(field->type, "float")) {
-                avro_value_set_float(&value, atof(word));
+                if ((field->nullable) && (0 == strcmp(word, "null"))) {
+                    avro_value_set_branch(&value, 0, &branch);
+                    avro_value_set_null(&branch);
+                } else {
+                    avro_value_set_branch(&value, 1, &branch);
+                    avro_value_set_float(&branch, atof(word));
+                }
             } else if (0 == strcmp(field->type, "array")) {
                 if (0 == strcmp(field->array_type, "int")) {
                     avro_value_t intv1, intv2;
@@ -582,7 +612,7 @@ static int write_record_to_file(
 
     if (avro_file_writer_append_value(db, &record)) {
         errorPrint(
-                "%s() LN%d, Unable to write record to file. Message: %s",
+                "%s() LN%d, Unable to write record to file. Message: %s\n",
                 __func__, __LINE__,
                 avro_strerror());
     }
