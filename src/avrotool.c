@@ -213,6 +213,7 @@ static void print_json_string(json_t *element, int indent) {
     printf("JSON String: \"%s\"\n", json_string_value(element));
 }
 
+#if 0 /* unused */
 static void print_json_integer(json_t *element, int indent) {
     print_json_indent(indent);
     printf("JSON Integer: \"%" JSON_INTEGER_FORMAT "\"\n", json_integer_value(element));
@@ -240,6 +241,7 @@ static void print_json_null(json_t *element, int indent) {
     print_json_indent(indent);
     printf("JSON Null\n");
 }
+#endif
 
 static void print_json_aux(json_t *element, int indent)
 {
@@ -256,6 +258,7 @@ static void print_json_aux(json_t *element, int indent)
             print_json_string(element, indent);
             break;
 
+#if 0 /* unused */
         case JSON_INTEGER:
             print_json_integer(element, indent);
             break;
@@ -275,6 +278,7 @@ static void print_json_aux(json_t *element, int indent)
         case JSON_NULL:
             print_json_null(element, indent);
             break;
+#endif
 
         default:
             errorPrint("unrecongnized JSON type %d\n", json_typeof(element));
