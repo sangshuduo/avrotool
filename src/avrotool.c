@@ -298,16 +298,6 @@ static json_t *load_json(char *jsonbuf)
     }
 }
 
-static void print_json_by_jansson(char *jsonbuf)
-{
-    json_t *root = load_json(jsonbuf);
-
-    if (root) {
-        print_json(root);
-        json_decref(root);
-    }
-}
-
 static void freeRecordSchema(RecordSchema *recordSchema)
 {
     if (recordSchema) {
