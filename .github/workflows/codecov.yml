@@ -19,22 +19,24 @@ jobs:
           cd debug
           cmake .. -DCOVER=true
           make
-          # case 0
+          # case 0: no arg
           ./build/bin/avrotool
-          # case 1
+          # case 1: --help
           ./build/bin/avrotool --help
-          # case 2
+          # case 2: test -w
           ./build/bin/avrotool -w ../out.avro -m ../sampledata/schema.json -d ../sampledata/data.csv -g
-          # case 3
+          # case 3: test -r
           ./build/bin/avrotool -r ../out.avro -g -c 5
-          # case 4
+          # case 4: test -s
           ./build/bin/avrotool -s ../out.avro -g
-          # case 5
+          # case 5: read wrong schema
           ./build/bin/avrotool -w ../failure.avro -d ../sampledata/schema.json -m ../sampledata/data.csv -g || :
-          # case 6
+            # case 6: write protected file
           ./build/bin/avrotool -w /bin/dmesg -m ../sampledata/schema.json -d ../sampledata/data.csv || :
-          # case 7
+            # case 7: read invalid file
           ./build/bin/avrotool -r /bin/dmesg -g || :
+            # case 8: unknown argument
+          ./build/bin/avrotool -r /bin/dmesg -x || :
 
           gcov -abcfu ../src/avrotool.c -o src/CMakeFiles/avrotool.dir/avrotool.c.gcno
       - name: Upload
