@@ -37,6 +37,8 @@ jobs:
           ./build/bin/avrotool -r /bin/dmesg -g || :
             # case 8: unknown argument
           ./build/bin/avrotool -r /bin/dmesg -x || :
+          # case 9: test -r invalid number
+          ./build/bin/avrotool -r ../out.avro -g -c x || :
 
           gcov -abcfu ../src/avrotool.c -o src/CMakeFiles/avrotool.dir/avrotool.c.gcno
       - name: Upload

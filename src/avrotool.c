@@ -308,7 +308,7 @@ static void freeRecordSchema(RecordSchema *recordSchema)
     }
 }
 
-static void read_avro_file()
+static int read_avro_file()
 {
     avro_file_reader_t reader;
     avro_writer_t stdout_writer = avro_writer_file_fp(stdout, 1);
@@ -320,7 +320,7 @@ static void read_avro_file()
     if(avro_file_reader(g_args.read_filename, &reader)) {
         errorPrint("Unable to open avro file %s: %s\n",
                 g_args.read_filename, avro_strerror());
-        exit(EXIT_FAILURE);
+        return -1;
     }
     schema = avro_file_reader_get_writer_schema(reader);
     printf("=== Schema:\n");
@@ -490,6 +490,8 @@ static void read_avro_file()
     avro_file_reader_close(reader);
     avro_writer_free(stdout_writer);
     avro_writer_free(jsonfile_writer);
+
+    return 0;
 }
 
 static int write_record_to_file(
@@ -881,7 +883,11 @@ int main(int argc, char **argv) {
     }
 
     if (g_args.read_file || g_args.schema_only) {
-        read_avro_file();
+        if (0 == read_avro_file()) {
+            okPrint("%s", "Success!\n");
+        } else {
+            errorPrint("%s", "Failed!\n");
+        }
     } else if (g_args.write_file) {
         if (0 == write_avro_file()) {
             okPrint("%s", "Success!\n");
