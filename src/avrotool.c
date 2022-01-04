@@ -761,7 +761,7 @@ static int write_avro_file()
     FILE *fp = fopen(g_args.json_filename, "r");
     if (NULL == fp) {
         errorPrint("Failed to open %s\n", g_args.json_filename);
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
     fseek(fp, 0, SEEK_END);
@@ -783,7 +783,7 @@ static int write_avro_file()
                 __func__, __LINE__, avro_strerror());
         fclose(fp);
         free(jsonbuf);
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
     if (g_args.debug_output) {
@@ -826,13 +826,14 @@ static int write_avro_file()
     int rval = avro_file_writer_create_with_codec
         (g_args.write_filename, schema, &db, QUICKSTOP_CODEC, 0);
     if (rval) {
+        avro_schema_decref(schema);
         freeRecordSchema(recordSchema);
         fclose(fp);
         errorPrint("There was an error creating %s\n", g_args.write_filename);
         errorPrint("%s() LN%d, error message: %s\n",
                 __func__, __LINE__,
                 avro_strerror());
-        exit(EXIT_FAILURE);
+        return -1;
     }
 
     FILE *fd = fopen(g_args.data_filename, "r");
