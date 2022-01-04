@@ -19,9 +19,21 @@ jobs:
           cd debug
           cmake .. -DCOVER=true
           make
+          # case 0
+          ./build/bin/avrotool
+          # case 1
           ./build/bin/avrotool --help
+          # case 2
           ./build/bin/avrotool -w ../out.avro -m ../sampledata/schema.json -d ../sampledata/data.csv -g
+          # case 3
           ./build/bin/avrotool -r ../out.avro -g -c 5
+          # case 4
+          ./build/bin/avrotool -w ../failure.avro -d ../sampledata/schema.json -m ../sampledata/data.csv -g || :
+          # case 5
+          ./build/bin/avrotool -w /bin/dmesg -m ../sampledata/schema.json -d ../sampledata/data.csv || :
+          # case 6
+          ./build/bin/avrotool -r /bin/dmesg -g || :
+
           gcov -abcfu ../src/avrotool.c -o src/CMakeFiles/avrotool.dir/avrotool.c.gcno
       - name: Upload
         uses: codecov/codecov-action@v2.1.0
