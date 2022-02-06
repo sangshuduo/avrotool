@@ -7,18 +7,28 @@
 [![codecov](https://codecov.io/gh/sangshuduo/avrotool/branch/develop/graph/badge.svg?token=RLFBKDE5HO)](https://codecov.io/gh/sangshuduo/avrotool)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/4dd10c80a97b41c7a786f12db0fba881)](https://www.codacy.com/gh/sangshuduo/avrotool/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=sangshuduo/avrotool&amp;utm_campaign=Badge_Grade)
 
-# install dependencies
+## install dependencies
+
 apt install libjansson-dev
 
-# build debug version
+## build debug version
+
 - For debug purpose
+
+```
 cmake .. -DCMAKE_BUILD_TYPE=DEBUG
+```
 
 - no debug info
-cmake ..
 
-# write data to avro example
+```
+cmake ..
+```
+
+## write data to avro example
+
 ./build/bin/avrotool -w w.avro -m ../sampledata/schema.json -d ../sampledata/data.csv
 
-# read avro file
+## read avro file
+
 ./build/bin/avrotool -r w.avro
