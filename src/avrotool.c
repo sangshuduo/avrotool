@@ -507,13 +507,14 @@ static int read_avro_file()
         avro_value_iface_decref(value_class);
     }
 
-    printf("\n");
-
     freeRecordSchema(recordSchema);
     avro_schema_decref(schema);
     avro_file_reader_close(reader);
     avro_writer_free(stdout_writer);
     avro_writer_free(jsonfile_writer);
+
+    printf("\n");
+    fflush(stdout);
 
     return 0;
 }

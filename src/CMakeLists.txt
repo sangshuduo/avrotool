@@ -30,14 +30,31 @@ IF (${COVER} MATCHES "true")
     SET(GCC_COVERAGE_LINK_FLAGS    "-lgcov --coverage")
 ENDIF ()
 
+ADD_EXECUTABLE(avrotool avrotool.c)
+
+SET(OS_ID "")
+EXECUTE_PROCESS (
+    COMMAND sh -c "awk -F= '/^ID=/{print $2}' /etc/os-release |tr -d '\n' | tr -d '\"'"
+    OUTPUT_VARIABLE OS_ID
+    )
+
 IF (${CMAKE_BUILD_TYPE} MATCHES "DEBUG")
     MESSAGE("${Yellow} DEBUG mode ${ColourReSET}")
     SET(CMAKE_C_FLAGS "-static-libasan -fsanitize=address -fsanitize=undefined -fno-sanitize-recover=all -fsanitize=float-divide-by-zero -fsanitize=float-cast-overflow -fno-sanitize=null -fno-sanitize=alignment -O0 -g3 -DDEBUG ${GCC_COVERAGE_COMPILE_FLAGS} ${GCC_COVERAGE_LINK_FLAGS}")
-ELSE ()
-    MESSAGE("${Green} RELEASE mode ${ColourReSET}")
-    SET(CMAKE_C_FLAGS "-DRELEASE ${GCC_COVERAGE_COMPILE_FLAGS} ${GCC_COVERAGE_LINK_FLAGS}")
-ENDIF (${CMAKE_BUILD_TYPE} MATCHES "DEBUG")
 
-ADD_EXECUTABLE(avrotool avrotool.c)
-TARGET_LINK_LIBRARIES(avrotool PRIVATE avro jansson)
+    TARGET_LINK_LIBRARIES(avrotool PRIVATE avro jansson)
+
+ELSE ()
+    MESSAGE("${Green} RELEASE mode use static avro library to link for release ${ColourReset}")
+    SET(CMAKE_C_FLAGS "-DRELEASE ${GCC_COVERAGE_COMPILE_FLAGS} ${GCC_COVERAGE_LINK_FLAGS}")
+
+    ADD_LIBRARY(avro STATIC IMPORTED)
+    IF(${OS_ID} MATCHES "centos")
+        SET_PROPERTY(TARGET avro PROPERTY IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/build/lib64/libavro.a")
+    ELSE()
+        SET_PROPERTY(TARGET avro PROPERTY IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/build/lib/libavro.a")
+    ENDIF()
+
+    TARGET_LINK_LIBRARIES(avrotool PRIVATE avro jansson snappy lzma z)
+ENDIF (${CMAKE_BUILD_TYPE} MATCHES "DEBUG")
 
