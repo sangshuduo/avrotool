@@ -14,5 +14,8 @@ INSTALL(TARGETS avrotool
   RUNTIME DESTINATION bin
 )
 
-install(DIRECTORY ${CMAKE_BINARY_DIR}/build/lib DESTINATION /usr/local)
+IF (${CMAKE_BUILD_TYPE} MATCHES "DEBUG")
+    install(DIRECTORY ${CMAKE_BINARY_DIR}/build/lib DESTINATION /usr/local)
+ENDIF ()
+
 install(CODE "execute_process(COMMAND ldconfig)")
