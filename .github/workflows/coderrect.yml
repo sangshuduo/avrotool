@@ -35,3 +35,5 @@ jobs:
 
     - name: coderrect scan
       uses: coderrect-inc/coderrect-github-action@main
+      with:
+        buildPath: "build"
