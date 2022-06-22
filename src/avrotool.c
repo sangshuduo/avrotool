@@ -859,13 +859,6 @@ static RecordSchema *parse_json_to_recordschema(json_t *element)
                                     }
                                 }
                             }
-                        } else if (0 == strcmp(ele_key, "items")) {
-                            int ele_value_items = json_typeof(ele_value);
-                            if (JSON_STRING == ele_value_items) {
-                                field->is_array = true;
-                                tstrncpy(field->array_type,
-                                        json_string_value(ele_value), TYPE_NAME_LEN-1);
-                            }
                         } else {
                             printf("uncatched: %s\n", ele_key);
                         }
