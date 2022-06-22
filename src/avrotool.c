@@ -424,8 +424,20 @@ static int read_avro_file()
                         avro_value_get_double(&field_value, &dbl);
                         printf("%f |\t", dbl);
                     } else if (0 == strcmp(field->type, "long")) {
-                        avro_value_get_long(&field_value, &n64);
-                        printf("%"PRId64" |\t", n64);
+                        if (field->nullable) {
+                            avro_value_t branch;
+                            avro_value_get_current_branch(&field_value,
+                                    &branch);
+                            if (0 == avro_value_get_null(&branch)) {
+                                printf("%s |\t", "null");
+                            } else {
+                                avro_value_get_long(&branch, &n64);
+                                printf("%"PRId64" |\t", n64);
+                            }
+                        } else {
+                            avro_value_get_long(&field_value, &n64);
+                            printf("%"PRId64" |\t", n64);
+                        }
                     } else if (0 == strcmp(field->type, "string")) {
                         if (field->nullable) {
                             avro_value_t branch;
