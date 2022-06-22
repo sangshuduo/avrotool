@@ -424,8 +424,20 @@ static int read_avro_file()
                         avro_value_get_double(&field_value, &dbl);
                         printf("%f |\t", dbl);
                     } else if (0 == strcmp(field->type, "long")) {
-                        avro_value_get_long(&field_value, &n64);
-                        printf("%"PRId64" |\t", n64);
+                        if (field->nullable) {
+                            avro_value_t branch;
+                            avro_value_get_current_branch(&field_value,
+                                    &branch);
+                            if (0 == avro_value_get_null(&branch)) {
+                                printf("%s |\t", "null");
+                            } else {
+                                avro_value_get_long(&branch, &n64);
+                                printf("%"PRId64" |\t", n64);
+                            }
+                        } else {
+                            avro_value_get_long(&field_value, &n64);
+                            printf("%"PRId64" |\t", n64);
+                        }
                     } else if (0 == strcmp(field->type, "string")) {
                         if (field->nullable) {
                             avro_value_t branch;
@@ -557,7 +569,17 @@ static int write_record_to_file(
                     avro_value_set_bytes(&branch, (void *)word, strlen(word));
                 }
             } else if (0 == strcmp(field->type, "long")) {
-                avro_value_set_long(&value, atol(word));
+                if (field->nullable) {
+                    if (0 == strcmp(word, "null")) {
+                        avro_value_set_branch(&value, 0, &branch);
+                        avro_value_set_null(&branch);
+                    } else {
+                        avro_value_set_branch(&value, 1, &branch);
+                        avro_value_set_long(&branch, atol(word));
+                    }
+                } else {
+                    avro_value_set_long(&value, atol(word));
+                }
             } else if (0 == strcmp(field->type, "int")) {
                 if (field->nullable) {
                     if (0 == strcmp(word, "null")) {
