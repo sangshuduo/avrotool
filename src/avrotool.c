@@ -569,7 +569,17 @@ static int write_record_to_file(
                     avro_value_set_bytes(&branch, (void *)word, strlen(word));
                 }
             } else if (0 == strcmp(field->type, "long")) {
-                avro_value_set_long(&value, atol(word));
+                if (field->nullable) {
+                    if (0 == strcmp(word, "null")) {
+                        avro_value_set_branch(&value, 0, &branch);
+                        avro_value_set_null(&branch);
+                    } else {
+                        avro_value_set_branch(&value, 1, &branch);
+                        avro_value_set_long(&branch, atol(word));
+                    }
+                } else {
+                    avro_value_set_long(&value, atol(word));
+                }
             } else if (0 == strcmp(field->type, "int")) {
                 if (field->nullable) {
                     if (0 == strcmp(word, "null")) {
