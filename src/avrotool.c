@@ -476,33 +476,71 @@ static int read_avro_file()
                             printf("%s |\t", b?"true":"false");
                         }
                     } else if (0 == strcmp(field->type, "array")) {
-                        size_t array_size;
-                        avro_value_get_size(&field_value, &array_size);
+                        if (field->nullable) {
+                            avro_value_t arr_branch;
+                            avro_value_get_current_branch(&field_value,
+                                    &arr_branch);
+                            if (0 == avro_value_get_null(&arr_branch)) {
+                                printf("%s |\t", "null");
+                            } else {
+                                size_t array_size;
+                                avro_value_get_size(&arr_branch, &array_size);
 
-                        debugPrint("array_size is %d\n", (int) array_size);
-                        if (0 == strcmp(field->array_type, "int")) {
-                            uint32_t array_u32 = 0;
-                            for (size_t item = 0; item < array_size; item ++) {
-                                avro_value_t item_value;
-                                avro_value_get_by_index(&field_value, item,
-                                        &item_value, NULL);
-                                avro_value_get_int(&item_value, &n32);
-                                array_u32 += n32;
+                                debugPrint("array_size is %d\n", (int) array_size);
+                                if (0 == strcmp(field->array_type, "int")) {
+                                    uint32_t array_u32 = 0;
+                                    for (size_t item = 0; item < array_size; item ++) {
+                                        avro_value_t item_value;
+                                        avro_value_get_by_index(&arr_branch, item,
+                                                &item_value, NULL);
+                                        avro_value_get_int(&item_value, &n32);
+                                        array_u32 += n32;
+                                    }
+                                    printf("%u |\t", array_u32);
+                                } else if (0 == strcmp(field->array_type, "long")) {
+                                    uint64_t array_u64 = 0;
+                                    for (size_t item = 0; item < array_size; item ++) {
+                                        avro_value_t item_value;
+                                        avro_value_get_by_index(&arr_branch, item,
+                                                &item_value, NULL);
+                                        avro_value_get_long(&item_value, &n64);
+                                        array_u64 += n64;
+                                    }
+                                    printf("%"PRIu64" |\t", array_u64);
+                                } else {
+                                    errorPrint("%s is not supported!\n",
+                                            field->array_type);
+                                }
                             }
-                            printf("%u |\t", array_u32);
-                        } else if (0 == strcmp(field->array_type, "long")) {
-                            uint64_t array_u64 = 0;
-                            for (size_t item = 0; item < array_size; item ++) {
-                                avro_value_t item_value;
-                                avro_value_get_by_index(&field_value, item,
-                                        &item_value, NULL);
-                                avro_value_get_long(&item_value, &n64);
-                                array_u64 += n64;
-                            }
-                            printf("%"PRIu64" |\t", array_u64);
                         } else {
-                            errorPrint("%s is not supported!\n",
-                                    field->array_type);
+                            size_t array_size;
+                            avro_value_get_size(&field_value, &array_size);
+
+                            debugPrint("array_size is %d\n", (int) array_size);
+                            if (0 == strcmp(field->array_type, "int")) {
+                                uint32_t array_u32 = 0;
+                                for (size_t item = 0; item < array_size; item ++) {
+                                    avro_value_t item_value;
+                                    avro_value_get_by_index(&field_value, item,
+                                            &item_value, NULL);
+                                    avro_value_get_int(&item_value, &n32);
+                                    array_u32 += n32;
+                                }
+                                printf("%u |\t", array_u32);
+                            } else if (0 == strcmp(field->array_type, "long")) {
+                                uint64_t array_u64 = 0;
+                                for (size_t item = 0; item < array_size; item ++) {
+                                    avro_value_t item_value;
+                                    avro_value_get_by_index(&field_value, item,
+                                            &item_value, NULL);
+                                    avro_value_get_long(&item_value, &n64);
+                                    array_u64 += n64;
+                                }
+                                printf("%"PRIu64" |\t", array_u64);
+                            } else {
+                                errorPrint("%s is not supported!\n",
+                                        field->array_type);
+                            }
                         }
                     }
                 }
@@ -741,10 +779,31 @@ static RecordSchema *parse_json_to_recordschema(json_t *element)
                                                 if(0 == strcmp(arr_type_ele_value_str,
                                                             "null")) {
                                                     field->nullable = true;
+                                                } else if(0 == strcmp(arr_type_ele_value_str,
+                                                            "array")) {
+                                                    field->is_array = true;
+                                                    tstrncpy(field->type,
+                                                            arr_type_ele_value_str,
+                                                            TYPE_NAME_LEN-1);
                                                 } else {
                                                     tstrncpy(field->type,
                                                             arr_type_ele_value_str,
                                                             TYPE_NAME_LEN-1);
+                                                }
+                                            } else if (JSON_OBJECT == json_typeof(arr_type_ele_value)) {
+                                                const char *arr_type_ele_value_key;
+                                                json_t *arr_type_ele_value_value;
+
+                                                json_object_foreach(arr_type_ele_value,
+                                                        arr_type_ele_value_key,
+                                                        arr_type_ele_value_value) {
+                                                    if (JSON_STRING == json_typeof(arr_type_ele_value_value)) {
+                                                        const char *arr_type_ele_value_value_str =
+                                                            json_string_value(arr_type_ele_value_value);
+                                                        tstrncpy(field->array_type,
+                                                                arr_type_ele_value_value_str,
+                                                                TYPE_NAME_LEN-1);
+                                                    }
                                                 }
                                             }
                                         }
@@ -800,6 +859,15 @@ static RecordSchema *parse_json_to_recordschema(json_t *element)
                                     }
                                 }
                             }
+                        } else if (0 == strcmp(ele_key, "items")) {
+                            int ele_value_items = json_typeof(ele_value);
+                            if (JSON_STRING == ele_value_items) {
+                                field->is_array = true;
+                                tstrncpy(field->array_type,
+                                        json_string_value(ele_value), TYPE_NAME_LEN-1);
+                            }
+                        } else {
+                            printf("uncatched: %s\n", ele_key);
                         }
                     }
                 }
