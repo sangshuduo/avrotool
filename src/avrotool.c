@@ -18,6 +18,17 @@
 #define FIELD_NAME_LEN      64
 #define TYPE_NAME_LEN       16
 
+#define TSDB_DATA_BOOL_NULL             0x02
+#define TSDB_DATA_TINYINT_NULL          0x80
+#define TSDB_DATA_SMALLINT_NULL         0x8000
+#define TSDB_DATA_INT_NULL              0x80000000L
+#define TSDB_DATA_BIGINT_NULL           0x8000000000000000L
+
+#define TSDB_DATA_UTINYINT_NULL         0xFF
+#define TSDB_DATA_USMALLINT_NULL        0xFFFF
+#define TSDB_DATA_UINT_NULL             0xFFFFFFFF
+#define TSDB_DATA_UBIGINT_NULL          0xFFFFFFFFFFFFFFFFL
+
 typedef struct FieldStruct_S {
     char name[FIELD_NAME_LEN];
     char type[TYPE_NAME_LEN];
@@ -403,7 +414,13 @@ static int read_avro_file()
                             }
                         } else {
                             avro_value_get_int(&field_value, &n32);
-                            printf("%d |\t", n32);
+                            if (((int32_t)TSDB_DATA_INT_NULL == n32)
+                                    || (TSDB_DATA_SMALLINT_NULL == n32)
+                                    || (TSDB_DATA_TINYINT_NULL == n32)) {
+                                fprintf(stdout, "%s |\t", "null?");
+                            } else {
+                                printf("%d |\t", n32);
+                            }
                         }
                     } else if (0 == strcmp(field->type, "float")) {
                         if (field->nullable) {
@@ -436,7 +453,11 @@ static int read_avro_file()
                             }
                         } else {
                             avro_value_get_long(&field_value, &n64);
-                            printf("%"PRId64" |\t", n64);
+                            if ((int64_t)TSDB_DATA_BIGINT_NULL == n64) {
+                                fprintf(stdout, "%s |\t", "null");
+                            } else {
+                                printf("%"PRId64" |\t", n64);
+                            }
                         }
                     } else if (0 == strcmp(field->type, "string")) {
                         if (field->nullable) {
@@ -526,7 +547,13 @@ static int read_avro_file()
                                     avro_value_get_int(&item_value, &n32);
                                     array_u32 += n32;
                                 }
-                                printf("%u |\t", array_u32);
+                                if ((TSDB_DATA_UINT_NULL == array_u32)
+                                        || (TSDB_DATA_USMALLINT_NULL == array_u32)
+                                        || (TSDB_DATA_UTINYINT_NULL == array_u32)) {
+                                    fprintf(stdout, "%s |\t", "null?");
+                                } else {
+                                    printf("%u |\t", array_u32);
+                                }
                             } else if (0 == strcmp(field->array_type, "long")) {
                                 uint64_t array_u64 = 0;
                                 for (size_t item = 0; item < array_size; item ++) {
@@ -536,7 +563,11 @@ static int read_avro_file()
                                     avro_value_get_long(&item_value, &n64);
                                     array_u64 += n64;
                                 }
-                                printf("%"PRIu64" |\t", array_u64);
+                                if (TSDB_DATA_UBIGINT_NULL == array_u64) {
+                                    fprintf(stdout, "%s |\t", "null?");
+                                } else {
+                                    printf("%"PRIu64" |\t", array_u64);
+                                }
                             } else {
                                 errorPrint("%s is not supported!\n",
                                         field->array_type);
