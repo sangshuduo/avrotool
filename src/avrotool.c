@@ -376,8 +376,8 @@ static int read_avro_file()
 
         json_decref(json_root);
         free(jsonbuf);
+        fclose(jsonfile);
     }
-    fclose(jsonfile);
 
     uint64_t count = 0;
 
@@ -686,20 +686,23 @@ static int write_record_to_file(
                     avro_value_t intv1, intv2;
                     unsigned long ultemp;
                     char *eptr;
-                    ultemp = strtoul(word, &eptr, 10);
-                    avro_value_append(&value, &intv1, NULL);
-                    avro_value_set_int(&intv1, (int32_t)(ultemp - INT_MAX));
-                    avro_value_append(&value, &intv2, NULL);
-                    avro_value_set_int(&intv2, INT_MAX);
+                    if (word) {
+                        ultemp = strtoul(word, &eptr, 10);
+                        avro_value_append(&value, &intv1, NULL);
+                        avro_value_set_int(&intv1, (int32_t)(ultemp - INT_MAX));
+                        avro_value_append(&value, &intv2, NULL);
+                        avro_value_set_int(&intv2, INT_MAX);
+                    }
                 } else if (0 == strcmp(field->array_type, "long")) {
                     avro_value_t longv1, longv2;
                     unsigned long long int ulltemp;
                     char *eptr;
-                    ulltemp = strtoull(word, &eptr, 10);
+                    if (word) {
+                        ulltemp = strtoull(word, &eptr, 10);
+                    }
                     if ( errno || (!ulltemp && word == NULL) ) {
                         fflush(stdout); // Don't cross the streams!
                         perror(word);
-//                        exit(EXIT_FAILURE);
                     }
                     avro_value_append(&value, &longv1, NULL);
                     avro_value_set_long(&longv1, (int64_t)(ulltemp - LONG_MAX));
