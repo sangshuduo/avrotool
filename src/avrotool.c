@@ -139,7 +139,8 @@ static bool isStringNumber(char *input)
         return false;
     }
 
-    for (int i = 0; i < len; i++) {
+    int i = 0;
+    for (i = 0; i < len; i++) {
         if (!isdigit(input[i]))
             return false;
     }
@@ -151,7 +152,8 @@ static bool parse_args(int argc, char *argv[], SArguments *arguments)
 {
     bool has_flags = true;
 
-    for (int i = 1; i < argc; i++) {
+    int i;
+    for (i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-r") == 0) {
             arguments->read_file = true;
             arguments->read_filename = argv[++i];
@@ -388,7 +390,8 @@ static int read_avro_file()
         avro_generic_value_new(value_class, &value);
 
         while(!avro_file_reader_read_value(reader, &value)) {
-            for (int i = 0; i < recordSchema->num_fields; i++) {
+            int i = 0;
+            for (i = 0; i < recordSchema->num_fields; i++) {
                 FieldStruct *field = (FieldStruct *)(recordSchema->fields + sizeof(FieldStruct) * i);
                 avro_value_t field_value;
                 int32_t n32;
@@ -510,7 +513,8 @@ static int read_avro_file()
                                 debugPrint("array_size is %d\n", (int) array_size);
                                 if (0 == strcmp(field->array_type, "int")) {
                                     uint32_t array_u32 = 0;
-                                    for (size_t item = 0; item < array_size; item ++) {
+                                    size_t item = 0;
+                                    for (item = 0; item < array_size; item ++) {
                                         avro_value_t item_value;
                                         avro_value_get_by_index(&arr_branch, item,
                                                 &item_value, NULL);
@@ -520,7 +524,8 @@ static int read_avro_file()
                                     printf("%u |\t", array_u32);
                                 } else if (0 == strcmp(field->array_type, "long")) {
                                     uint64_t array_u64 = 0;
-                                    for (size_t item = 0; item < array_size; item ++) {
+                                    size_t item = 0;
+                                    for (item = 0; item < array_size; item ++) {
                                         avro_value_t item_value;
                                         avro_value_get_by_index(&arr_branch, item,
                                                 &item_value, NULL);
@@ -540,7 +545,8 @@ static int read_avro_file()
                             debugPrint("array_size is %d\n", (int) array_size);
                             if (0 == strcmp(field->array_type, "int")) {
                                 uint32_t array_u32 = 0;
-                                for (size_t item = 0; item < array_size; item ++) {
+                                size_t item = 0;
+                                for (item = 0; item < array_size; item ++) {
                                     avro_value_t item_value;
                                     avro_value_get_by_index(&field_value, item,
                                             &item_value, NULL);
@@ -556,7 +562,8 @@ static int read_avro_file()
                                 }
                             } else if (0 == strcmp(field->array_type, "long")) {
                                 uint64_t array_u64 = 0;
-                                for (size_t item = 0; item < array_size; item ++) {
+                                size_t item = 0;
+                                for (item = 0; item < array_size; item ++) {
                                     avro_value_t item_value;
                                     avro_value_get_by_index(&field_value, item,
                                             &item_value, NULL);
@@ -614,7 +621,8 @@ static int write_record_to_file(
 
     char *word;
 
-    for(int i = 0; i < recordSchema->num_fields; i++) {
+    int i = 0;
+    for(i = 0; i < recordSchema->num_fields; i++) {
         word = strsep(&line, ",");
 
         avro_value_t value;
@@ -781,7 +789,8 @@ static RecordSchema *parse_json_to_recordschema(json_t *element)
                             } else if (JSON_ARRAY == ele_type) {
                                 size_t ele_size = json_array_size(ele_value);
 
-                                for(size_t ele_i = 0; ele_i < ele_size;
+                                size_t ele_i = 0;
+                                for(ele_i = 0; ele_i < ele_size;
                                         ele_i ++) {
                                     json_t *arr_type_ele =
                                         json_array_get(ele_value, ele_i);
